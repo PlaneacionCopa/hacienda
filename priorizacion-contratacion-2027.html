@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title> 2027</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy-900:#152a5c;
+    --navy-800:#1e3a8a;
+    --navy-700:#1e40af;
+    --navy-050:#eef2ff;
+    --ink:#1f2937;
+    --ink-soft:#5b6472;
+    --line:#e2e5ec;
+    --paper:#ffffff;
+    --page-bg-1:#ffffff;
+    --page-bg-2:#ffffff;
+    --amber:#b45309;
+    --amber-bg:#fff7e6;
+    --green:#0f7a3d;
+    --green-bg:#eafaf0;
+    --red:#b91c1c;
+    --red-bg:#fdecec;
+    --focus:#2563eb;
+  }
+  /* Tema forzado siempre claro: no se adapta al modo oscuro del sistema */
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Public Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background:linear-gradient(180deg, var(--page-bg-1), var(--page-bg-2));
+    color:var(--ink);
+    min-height:100vh;
+    padding:1.5rem 1rem 3rem;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+
+  .topbar{
+    display:flex;flex-wrap:wrap;gap:.85rem;align-items:center;justify-content:space-between;
+    margin-bottom:1.25rem;
+  }
+  .brand{display:flex;align-items:center;gap:.7rem;color:var(--navy-900);}
+  .brand .badge-shield{
+    width:38px;height:38px;border-radius:9px;background:var(--paper);
+    box-shadow:0 4px 10px rgba(30,58,138,.18);
+    display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;
+  }
+  .brand h1{font-size:1.05rem;font-weight:700;margin:0;line-height:1.25;color:var(--navy-900);}
+  .brand p{margin:0;font-size:.78rem;color:var(--navy-700);opacity:.75;}
+
+  .card{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:0 14px 32px rgba(30,58,138,.12);
+    overflow:hidden;
+  }
+
+  .ctrl-row{
+    display:flex;flex-wrap:wrap;gap:.9rem;align-items:flex-end;
+    padding:1.25rem 1.4rem;border-bottom:1px solid var(--line);
+    background:var(--navy-050);
+  }
+  .field{display:flex;flex-direction:column;gap:.3rem;}
+  .field label{font-size:.72rem;font-weight:600;color:var(--ink-soft);}
+  select, input, textarea{
+    font:inherit;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:8px;padding:.5rem .65rem;
+  }
+  select:focus, input:focus, textarea:focus{outline:2px solid var(--focus);outline-offset:1px;}
+  select:disabled, input:disabled{background:var(--navy-050);color:var(--ink-soft);}
+  .sel-secretaria{min-width:260px;}
+
+  .status-pill{
+    font-size:.72rem;font-weight:700;padding:.32rem .7rem;border-radius:999px;
+    display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;
+  }
+  .status-borrador{background:var(--amber-bg);color:var(--amber);}
+  .status-enviado{background:var(--green-bg);color:var(--green);}
+
+  .summary-strip{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+    border-bottom:1px solid var(--line);
+  }
+  .summary-item{padding:.95rem 1.4rem;border-right:1px solid var(--line);}
+  .summary-item:last-child{border-right:none;}
+  .summary-item .num{font-size:1.35rem;font-weight:800;line-height:1;}
+  .summary-item .lbl{font-size:.72rem;color:var(--ink-soft);margin-top:.3rem;}
+
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;
+    padding:1rem 1.4rem;
+  }
+  .toolbar h2{font-size:.95rem;margin:0;font-weight:700;}
+
+  .btn{
+    font:inherit;font-weight:700;font-size:.85rem;border:none;border-radius:9px;
+    padding:.6rem 1.05rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;
+    transition:filter .15s ease;
+  }
+  .btn:hover{filter:brightness(0.94);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;filter:none;}
+  .btn-primary{background:var(--navy-800);color:#fff;}
+  .btn-success{background:#158a45;color:#fff;}
+  .btn-ghost{background:transparent;color:var(--navy-800);border:1px solid var(--line);}
+  .btn-danger-text{background:transparent;color:var(--red);padding:.35rem .5rem;font-size:.8rem;}
+  .btn-sm{padding:.4rem .7rem;font-size:.78rem;}
+
+  .banner{
+    margin:0 1.4rem 1rem;padding:.8rem 1rem;border-radius:9px;font-size:.85rem;
+    display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;
+  }
+  .banner-green{background:var(--green-bg);color:var(--green);border:1px solid rgba(15,122,61,.25);}
+
+  .empty{
+    padding:2.6rem 1.4rem;text-align:center;color:var(--ink-soft);
+  }
+  .empty .glyph{font-size:1.8rem;margin-bottom:.5rem;}
+
+  .items{padding:0 1.4rem 1.4rem;display:flex;flex-direction:column;gap:.7rem;}
+  .item-card{
+    border:1px solid var(--line);border-radius:11px;padding:.9rem 1rem;
+    display:flex;flex-direction:column;gap:.5rem;
+  }
+  .item-top{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;}
+  .item-objeto{font-weight:600;font-size:.92rem;line-height:1.35;}
+  .item-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem;}
+  .tag{
+    font-size:.7rem;font-weight:600;padding:.22rem .55rem;border-radius:6px;
+    background:var(--navy-050);color:var(--navy-800);white-space:nowrap;
+  }
+  .item-actions{display:flex;gap:.35rem;flex-shrink:0;}
+  .item-bottom{
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;
+    font-size:.78rem;color:var(--ink-soft);border-top:1px dashed var(--line);padding-top:.5rem;
+  }
+  .item-bottom .total{font-weight:800;color:var(--ink);font-size:.92rem;}
+
+  /* modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(10,15,30,.55);
+    display:none;align-items:flex-start;justify-content:center;
+    padding:2.2rem 1rem;overflow-y:auto;z-index:50;
+  }
+  .overlay.open{display:flex;}
+  .modal{
+    background:var(--paper);border-radius:14px;max-width:760px;width:100%;
+    box-shadow:0 30px 60px rgba(0,0,0,.4);
+  }
+  .modal-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:1.1rem 1.4rem;border-bottom:1px solid var(--line);
+  }
+  .modal-head h3{margin:0;font-size:1rem;}
+  .modal-close{background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;line-height:1;}
+  .modal-body{padding:1.2rem 1.4rem;display:flex;flex-direction:column;gap:1.1rem;max-height:70vh;overflow-y:auto;}
+  .modal-foot{
+    padding:1rem 1.4rem;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:.6rem;
+    background:var(--navy-050);
+  }
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem;}
+  @media (max-width:640px){ .grid2, .grid3{grid-template-columns:1fr;} }
+  .section-label{
+    font-size:.72rem;font-weight:700;text-transform:none;color:var(--navy-800);
+    border-left:3px solid var(--navy-800);padding-left:.5rem;
+  }
+  .hint{font-size:.72rem;color:var(--ink-soft);margin-top:.15rem;}
+  .req::after{content:" *";color:var(--red);}
+
+  .fuente-row{display:grid;grid-template-columns:1fr 150px 34px;gap:.5rem;align-items:center;}
+  .fuente-add{margin-top:.2rem;}
+  .fuentes-total{
+    display:flex;justify-content:space-between;font-size:.82rem;padding:.55rem .7rem;
+    border-radius:8px;margin-top:.3rem;
+  }
+  .fuentes-ok{background:var(--green-bg);color:var(--green);}
+  .fuentes-bad{background:var(--red-bg);color:var(--red);}
+
+  .radio-group{display:flex;gap:1rem;align-items:center;}
+  .radio-group label{display:flex;align-items:center;gap:.35rem;font-size:.85rem;font-weight:500;}
+
+  .error-text{color:var(--red);font-size:.78rem;margin-top:.15rem;}
+  .field-error input, .field-error select, .field-error textarea{border-color:var(--red);}
+
+  .disabled-note{font-size:.78rem;color:var(--ink-soft);font-style:italic;}
+
+  .login-wrap{
+    min-height:80vh;display:flex;align-items:center;justify-content:center;
+  }
+  .login-card{max-width:380px;width:100%;}
+  .login-head{padding:1.7rem 1.4rem .4rem;text-align:center;}
+  .login-head .badge-shield{margin:0 auto .6rem;}
+  .login-head h1{margin:0 0 .2rem;font-size:1.05rem;}
+  .login-head p{margin:0;font-size:.78rem;color:var(--ink-soft);}
+  .login-form{padding:1.4rem;display:flex;flex-direction:column;gap:.9rem;}
+
+  .userbar{display:flex;align-items:center;gap:.6rem;}
+
+  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.25rem;}
+  .stat-card{padding:1.1rem 1.3rem;}
+  .stat-num{font-size:1.6rem;font-weight:800;color:var(--navy-900);line-height:1.15;}
+  .stat-lbl{font-size:.78rem;color:var(--ink-soft);margin-top:.35rem;}
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem;}
+  .chart-card{padding-bottom:.6rem;}
+  .chart-wrap{position:relative;height:250px;padding:0 1.2rem 1.1rem;}
+  .chart-wrap-tall{height:330px;}
+  @media (max-width:760px){ .stats-row{grid-template-columns:1fr;} .charts-row{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="wrap login-wrap" id="loginScreen">
+  <div class="card login-card">
+    <div class="login-head">
+      <div class="badge-shield">🏛️</div>
+      <h1>Priorización de Contratación 2027</h1>
+      <p>Ingresa con tu correo institucional</p>
+    </div>
+    <form class="login-form" id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Correo</label>
+        <input type="email" id="loginEmail" required placeholder="nombre@copacabana.gov.co" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="loginPassword">Contraseña</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </div>
+      <div class="error-text" id="loginError"></div>
+      <button type="submit" class="btn btn-primary" id="btnLogin" style="justify-content:center;">Iniciar sesión</button>
+    </form>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div class="wrap" id="appScreen" style="display:none;">
+  <div class="topbar">
+    <div class="brand">
+      <div class="badge-shield">🏛️</div>
+      <div>
+        <h1>Priorización de Contratación 2027</h1>
+        <p>Formulario de captura por secretaría · A-CBS-F-021 (borrador)</p>
+      </div>
+    </div>
+    <div class="userbar">
+      <span class="tag" id="userBadge">—</span>
+      <button class="btn btn-ghost btn-sm" id="btnLogout">Cerrar sesión</button>
+    </div>
+  </div>
+
+  <!-- Panel de control del admin: vista de todas las secretarías -->
+  <div class="card" id="adminOverviewCard" style="display:none;margin-bottom:1.25rem;">
+    <div class="toolbar">
+      <h2>Panel de administración — todas las secretarías</h2>
+      <span class="disabled-note" id="adminOverviewTotalBox"></span>
+    </div>
+    <div id="adminOverviewTable" style="padding:0 1.4rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;"></div>
+  </div>
+
+  <!-- Vista de captura (secretaría / admin) -->
+  <div class="card" id="captureCard" style="display:none;">
+    <div class="ctrl-row">
+      <div class="field">
+        <label for="secretariaSelect">Secretaría</label>
+        <select id="secretariaSelect" class="sel-secretaria"></select>
+      </div>
+      <div class="field">
+        <label>Estado de la lista</label>
+        <span id="statusPill" class="status-pill status-borrador">● Borrador</span>
+      </div>
+      <div class="field" style="margin-left:auto;">
+        <label>&nbsp;</label>
+        <span class="disabled-note" id="secretariaNote"></span>
+      </div>
+    </div>
+
+    <div class="summary-strip">
+      <div class="summary-item">
+        <div class="num" id="statCount">0</div>
+        <div class="lbl">Necesidades priorizadas</div>
+      </div>
+      <div class="summary-item">
+        <div class="num" id="statTotal">$0</div>
+        <div class="lbl">Total proyectado</div>
+      </div>
+      <div class="summary-item">
+        <div class="num" id="statPS">0</div>
+        <div class="lbl">De prestación de servicios</div>
+      </div>
+    </div>
+
+    <div id="enviadoBanner" class="banner banner-green" style="display:none;margin-top:1rem;">
+      <span>✅ Esta lista ya fue enviada y quedó bloqueada para edición. Solo un administrador puede modificarla.</span>
+      <button class="btn btn-ghost btn-sm" id="btnReabrir">Reabrir lista</button>
+    </div>
+
+    <div class="toolbar">
+      <h2>Necesidades priorizadas</h2>
+      <div style="display:flex;gap:.6rem;">
+        <button class="btn btn-ghost" id="btnAdd">＋ Agregar necesidad</button>
+        <button class="btn btn-success" id="btnEnviar">Enviar lista definitiva</button>
+      </div>
+    </div>
+
+    <div id="emptyState" class="empty">
+      <div class="glyph">📋</div>
+      <div>Todavía no hay necesidades agregadas para esta secretaría.</div>
+    </div>
+
+    <div id="itemsList" class="items"></div>
+  </div>
+
+  <!-- Vista del alcalde (solo lectura, con gráficas) -->
+  <div id="alcaldeWrap" style="display:none;">
+    <div class="stats-row">
+      <div class="card stat-card">
+        <div class="stat-num" id="dashTotalProyectado">$0</div>
+        <div class="stat-lbl">Total proyectado del municipio</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-num" id="dashEnviadas">0 / 0</div>
+        <div class="stat-lbl">Secretarías con lista enviada</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-num" id="dashNecesidades">0</div>
+        <div class="stat-lbl">Necesidades priorizadas</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card chart-card">
+        <div class="toolbar"><h2>Total proyectado por secretaría</h2></div>
+        <div class="chart-wrap chart-wrap-tall"><canvas id="chartTotalPorSecretaria"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="toolbar"><h2>Estado de envío</h2></div>
+        <div class="chart-wrap"><canvas id="chartEstadoEnvio"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card chart-card">
+        <div class="toolbar"><h2>Necesidades priorizadas por secretaría</h2></div>
+        <div class="chart-wrap chart-wrap-tall"><canvas id="chartNecesidadesPorSecretaria"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="toolbar"><h2>Distribución por servicio a contratar</h2></div>
+        <div class="chart-wrap"><canvas id="chartServicio"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <h2>Detalle por secretaría</h2>
+        <span class="disabled-note">Todo en esta página se actualiza solo, en tiempo real.</span>
+      </div>
+      <div id="alcaldeTable" style="padding:0 1.4rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal agregar/editar -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle">Agregar necesidad de contratación</h3>
+      <button class="modal-close" id="btnCloseModal">×</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+
+      <div>
+        <div class="section-label">Identificación (opcional)</div>
+        <div class="grid2" style="margin-top:.6rem;">
+          <div class="field">
+            <label for="f_identificacion">Identificación del tercero</label>
+            <input id="f_identificacion" inputmode="numeric" placeholder="Solo números">
+          </div>
+          <div class="field">
+            <label for="f_nombre">Nombre del tercero</label>
+            <input id="f_nombre" placeholder="Nombre completo">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Necesidad</div>
+        <div class="grid2" style="margin-top:.6rem;">
+          <div class="field">
+            <label for="f_actividad">Actividad a desarrollar</label>
+            <input id="f_actividad" placeholder="Monitor, abogado, médico, nutricionista...">
+          </div>
+          <div class="field">
+            <label for="f_servicio" class="req">Servicio a contratar</label>
+            <select id="f_servicio"></select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:.9rem;">
+          <label for="f_objeto" class="req">Objeto</label>
+          <textarea id="f_objeto" rows="2" placeholder="Describa el objeto del contrato..."></textarea>
+          <div class="error-text" id="err_objeto"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Plan de Desarrollo</div>
+        <div class="grid2" style="margin-top:.6rem;">
+          <div class="field">
+            <label for="f_bpin" class="req">BPIN</label>
+            <select id="f_bpin"></select>
+            <div class="error-text" id="err_bpin"></div>
+          </div>
+          <div class="field">
+            <label for="f_indicador" class="req">Indicador</label>
+            <select id="f_indicador"></select>
+            <div class="hint">Se listan solo indicadores pendientes por cumplir.</div>
+            <div class="error-text" id="err_indicador"></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Contrato</div>
+        <div class="grid3" style="margin-top:.6rem;">
+          <div class="field">
+            <label for="f_tipo" class="req">Tipo de contrato</label>
+            <select id="f_tipo"></select>
+          </div>
+          <div class="field">
+            <label for="f_modalidad" class="req">Modalidad de selección</label>
+            <select id="f_modalidad"></select>
+          </div>
+          <div class="field">
+            <label for="f_formapago" class="req">Forma de pago</label>
+            <select id="f_formapago"></select>
+          </div>
+        </div>
+
+        <div class="grid3" style="margin-top:.9rem;">
+          <div class="field">
+            <label for="f_inicio" class="req">Fecha inicio</label>
+            <input type="date" id="f_inicio">
+          </div>
+          <div class="field">
+            <label for="f_fin" class="req">Fecha fin</label>
+            <input type="date" id="f_fin">
+          </div>
+          <div class="field">
+            <label>Duración</label>
+            <input id="f_dias" disabled placeholder="0 días">
+          </div>
+        </div>
+
+        <div class="grid2" id="honorariosRow" style="margin-top:.9rem;">
+          <div class="field">
+            <label for="f_honorarios">Honorarios mensuales</label>
+            <input id="f_honorarios" inputmode="numeric" placeholder="Ej: 3.200.000">
+            <div class="hint" id="honorariosHint">Valor libre acordado para el contratista (no aplica escala salarial de funcionarios).</div>
+          </div>
+          <div class="field">
+            <label for="f_total" class="req">Total proyección del contrato</label>
+            <input id="f_total" inputmode="numeric" placeholder="0">
+            <div class="hint" id="totalHint">Cálculo estimado: honorarios mensuales × (días ÷ 30).</div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:.9rem;">
+          <label>¿Es vigencia futura?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="f_vigencia" value="no" checked> No</label>
+            <label><input type="radio" name="f_vigencia" value="si"> Sí</label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Fuentes de financiación</div>
+        <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.45rem;"></div>
+        <button type="button" class="btn btn-ghost btn-sm fuente-add" id="btnAddFuente">＋ Agregar fuente</button>
+        <div class="fuentes-total" id="fuentesTotalBox"></div>
+      </div>
+
+      <div>
+        <div class="section-label">Justificación</div>
+        <div class="grid2" style="margin-top:.6rem;">
+          <div class="field">
+            <label for="f_just_tecnica">Justificación técnica</label>
+            <textarea id="f_just_tecnica" rows="2"></textarea>
+          </div>
+          <div class="field">
+            <label for="f_just_juridica">Justificación jurídica</label>
+            <textarea id="f_just_juridica" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="field" style="margin-top:.9rem;">
+          <label for="f_articulo">Si es contratación obligatoria por ley o norma, indique el artículo</label>
+          <input id="f_articulo" placeholder="Ej: Ley 1955 de 2019, art. 8...">
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="btnCancelModal">Cancelar</button>
+      <button class="btn btn-primary" id="btnSaveItem">Guardar necesidad</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Conexión a Supabase ----------
+  var SUPABASE_URL = "https://jhzgledulxburriroxod.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoemdsZWR1bHhidXJyaXJveG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk0OTI3NTQsImV4cCI6MjEwNTA2ODc1NH0.2EOr2u8vZEmUhjs2UFLRpuI78RdNgx5PdRkQBSBbegA";
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ---------- Listas de referencia (demo — BPIN/Indicador siguen fijas por ahora) ----------
+  var BPIN_OPTIONS = [
+    {v:"2024052120062", l:"2024052120062 · Fortalecimiento servicios de salud"},
+    {v:"2024052120063", l:"2024052120063 · Gobernanza de la salud"},
+    {v:"2024052120065", l:"2024052120065 · Programa de Alimentación Escolar - PAE"},
+    {v:"2024052120030", l:"2024052120030 · Desarrollo económico integral"},
+    {v:"2024052120068", l:"2024052120068 · Cultura y práctica deportiva"},
+    {v:"2024052120022", l:"2024052120022 · Gestión integral de residuos sólidos"},
+    {v:"2024052120050", l:"2024052120050 · Mejoramiento infraestructura pública"},
+    {v:"2024052120038", l:"2024052120038 · Plan de seguridad y convivencia"},
+    {v:"202500000021180", l:"202500000021180 · Fortalecimiento pedagógico sistema educativo"},
+    {v:"__mas__", l:"… (en producción: listado completo de Necesidades)"}
+  ];
+
+  var INDICADOR_OPTIONS = [
+    {v:"1.1.1.2", l:"1.1.1.2 · Cobertura primer nivel de salud – PNA"},
+    {v:"1.1.4.1", l:"1.1.4.1 · Ejecución Fondo Local de Salud"},
+    {v:"1.2.1.7", l:"1.2.1.7 · Estudiantes beneficiados con PAE"},
+    {v:"1.4.1.3", l:"1.4.1.3 · Niños/jóvenes inscritos en Escuelas Deportivas"},
+    {v:"2.1.5.1", l:"2.1.5.1 · Plan de Gestión Integral de Residuos actualizado"},
+    {v:"4.11.1.9", l:"4.11.1.9 · Plan Integral de Seguridad – PISCC"},
+    {v:"5.1.1.1", l:"5.1.1.1 · Gestión de la información financiera"},
+    {v:"__mas__", l:"… (en producción: solo indicadores pendientes por cumplir)"}
+  ];
+
+  var SERVICIOS = ["Asistencial","Auxiliar de oficina","Técnico","Tecnólogo","Profesional"];
+
+  var TIPOS_CONTRATO = [
+    {v:"prestacion", l:"1 – Prestación de servicios"},
+    {v:"suministro", l:"2 – Suministro"},
+    {v:"compraventa", l:"3 – Compraventa"},
+    {v:"arrendamiento", l:"4 – Arrendamiento"},
+    {v:"obra", l:"5 – Obra"},
+    {v:"comodato", l:"6 – Comodato"},
+    {v:"interadministrativo", l:"7 – Interadministrativo"},
+    {v:"concesion", l:"8 – Concesión"},
+    {v:"consultoria", l:"12 – Consultoría"},
+    {v:"seguros", l:"13 – Seguros"}
+  ];
+
+  var MODALIDADES = [
+    {v:"cce-05", l:"CCE-05 · Contratación directa (con ofertas)"},
+    {v:"cce-06", l:"CCE-06 · Selección abreviada menor cuantía"},
+    {v:"cce-10", l:"CCE-10 · Mínima cuantía"},
+    {v:"cce-16", l:"CCE-16 · Contratación directa"},
+    {v:"cce-02", l:"CCE-02 · Licitación pública"}
+  ];
+
+  var FORMAS_PAGO = ["Mensual","Bimensual","Trimestral","Semestral","Pago único"];
+
+  // ---------- Utilidades ----------
+  function uid(){ return "it_" + Math.random().toString(36).slice(2,9); }
+  function fmtCOP(n){
+    n = Number(n)||0;
+    try{ return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n); }
+    catch(e){ return "$" + n.toLocaleString('es-CO'); }
+  }
+  function calcDiasInclusive(inicioStr, finStr){
+    if(!inicioStr || !finStr) return 0;
+    var pi = inicioStr.split("-").map(Number), pf = finStr.split("-").map(Number);
+    var inicio = new Date(pi[0], pi[1]-1, pi[2]);
+    var fin = new Date(pf[0], pf[1]-1, pf[2]);
+    var dias = Math.round((fin - inicio)/(24*60*60*1000)) + 1;
+    return dias > 0 ? dias : 0;
+  }
+  function fillSelect(sel, opts, placeholder){
+    sel.innerHTML = "";
+    var ph = document.createElement("option");
+    ph.value = ""; ph.textContent = placeholder || "Seleccionar...";
+    sel.appendChild(ph);
+    opts.forEach(function(o){
+      var op = document.createElement("option");
+      if (typeof o === "string"){ op.value = o; op.textContent = o; }
+      else { op.value = o.v; op.textContent = o.l; }
+      sel.appendChild(op);
+    });
+  }
+  function onlyDigits(str){ return String(str||"").replace(/[^\d]/g,""); }
+  function escapeHtml(s){
+    return String(s || "").replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function tipoLabel(v){ var f2 = TIPOS_CONTRATO.find(function(t){return t.v===v;}); return f2 ? f2.l.replace(/^\d+\s*–\s*/, "") : v; }
+
+  // ---------- Estado de sesión / datos ----------
+  var profile = null; // {id, full_name, role, secretaria_id}
+  var secretariasCatalog = []; // [{id, nombre}]
+  var currentSecretariaId = null;
+  var state = { status: "borrador", items: [] };
+  var editingId = null;
+  var fuentesDraft = [];
+  var realtimeChannel = null;
+  var realtimeChannelOverview = null;
+
+  function secretariaNombre(id){
+    var s = secretariasCatalog.find(function(x){ return x.id === id; });
+    return s ? s.nombre : id;
+  }
+
+  // ---------- Elementos ----------
+  var els = {
+    secretariaSelect: document.getElementById("secretariaSelect"),
+    secretariaNote: document.getElementById("secretariaNote"),
+    statusPill: document.getElementById("statusPill"),
+    statCount: document.getElementById("statCount"),
+    statTotal: document.getElementById("statTotal"),
+    statPS: document.getElementById("statPS"),
+    itemsList: document.getElementById("itemsList"),
+    emptyState: document.getElementById("emptyState"),
+    enviadoBanner: document.getElementById("enviadoBanner"),
+    btnAdd: document.getElementById("btnAdd"),
+    btnEnviar: document.getElementById("btnEnviar"),
+    btnReabrir: document.getElementById("btnReabrir"),
+    overlay: document.getElementById("overlay"),
+    modalTitle: document.getElementById("modalTitle")
+  };
+
+  // ---------- Login / sesión ----------
+  function showLogin(){
+    document.getElementById("loginScreen").style.display = "flex";
+    document.getElementById("appScreen").style.display = "none";
+  }
+  function showApp(){
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("appScreen").style.display = "block";
+  }
+
+  document.getElementById("loginForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+    var email = document.getElementById("loginEmail").value.trim();
+    var pass = document.getElementById("loginPassword").value;
+    var errEl = document.getElementById("loginError");
+    errEl.textContent = "";
+    var btn = document.getElementById("btnLogin");
+    btn.disabled = true; btn.textContent = "Ingresando...";
+    var res = await sb.auth.signInWithPassword({ email: email, password: pass });
+    btn.disabled = false; btn.textContent = "Iniciar sesión";
+    if (res.error){ errEl.textContent = "Correo o contraseña incorrectos."; return; }
+    await afterLogin();
+  });
+
+  document.getElementById("btnLogout").addEventListener("click", async function(){
+    if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+    if (realtimeChannelOverview){ sb.removeChannel(realtimeChannelOverview); realtimeChannelOverview = null; }
+    await sb.auth.signOut();
+    location.reload();
+  });
+
+  function renderUserBar(){
+    var roleLabel = { secretaria: "Secretaría", admin: "Administrador", alcalde: "Alcalde" }[profile.role] || profile.role;
+    document.getElementById("userBadge").textContent = (profile.full_name || "") + " · " + roleLabel;
+  }
+
+  async function afterLogin(){
+    try{
+      var userRes = await sb.auth.getUser();
+      var user = userRes.data.user;
+      if (!user) throw new Error("Sin usuario");
+
+      var profRes = await sb.from("profiles").select("id, full_name, role, secretaria_id").eq("id", user.id).single();
+      if (profRes.error || !profRes.data) throw profRes.error || new Error("Perfil no encontrado");
+      profile = profRes.data;
+
+      var secsRes = await sb.from("secretarias").select("id, nombre").order("nombre");
+      secretariasCatalog = secsRes.data || [];
+
+      showApp();
+      renderUserBar();
+
+      if (profile.role === "alcalde"){
+        document.getElementById("captureCard").style.display = "none";
+        document.getElementById("adminOverviewCard").style.display = "none";
+        document.getElementById("alcaldeWrap").style.display = "block";
+        await renderAlcaldeView();
+      } else {
+        document.getElementById("captureCard").style.display = "block";
+        document.getElementById("alcaldeWrap").style.display = "none";
+        setupCaptureControls();
+        currentSecretariaId = profile.role === "secretaria" ? profile.secretaria_id : (secretariasCatalog[0] ? secretariasCatalog[0].id : null);
+        els.secretariaSelect.value = currentSecretariaId;
+        if (profile.role === "admin"){
+          document.getElementById("adminOverviewCard").style.display = "block";
+          await renderAdminOverview();
+          subscribeRealtimeOverview();
+        } else {
+          document.getElementById("adminOverviewCard").style.display = "none";
+        }
+        await loadSecretariaData();
+      }
+    }catch(err){
+      console.error(err);
+      alert("No se pudo cargar tu perfil. Contacta al administrador.");
+      await sb.auth.signOut();
+      showLogin();
+    }
+  }
+
+  async function init(){
+    var sessRes = await sb.auth.getSession();
+    if (sessRes.data && sessRes.data.session){
+      await afterLogin();
+    } else {
+      showLogin();
+    }
+  }
+
+  // ---------- Vista de captura: setup según rol ----------
+  function setupCaptureControls(){
+    fillSelect(els.secretariaSelect, secretariasCatalog.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
+    if (profile.role === "admin"){
+      els.secretariaSelect.disabled = false;
+      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría.";
+    } else {
+      els.secretariaSelect.disabled = true;
+      els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
+    }
+    els.secretariaSelect.onchange = async function(){
+      currentSecretariaId = els.secretariaSelect.value;
+      highlightAdminOverviewRow();
+      await loadSecretariaData();
+    };
+  }
+
+  // ---------- Carga de datos de una secretaría ----------
+  async function loadSecretariaData(){
+    if (!currentSecretariaId) return;
+    els.secretariaSelect.value = currentSecretariaId;
+
+    var listaRes = await sb.from("priorizacion_listas").select("status").eq("secretaria_id", currentSecretariaId).single();
+    state.status = (listaRes.data && listaRes.data.status) || "borrador";
+
+    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).order("created_at", { ascending: true });
+    var rawItems = itemsRes.data || [];
+    var itemIds = rawItems.map(function(i){ return i.id; });
+
+    var fuentesByItem = {};
+    if (itemIds.length){
+      var fuentesRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", itemIds);
+      (fuentesRes.data || []).forEach(function(f2){
+        if (!fuentesByItem[f2.item_id]) fuentesByItem[f2.item_id] = [];
+        fuentesByItem[f2.item_id].push({ id: f2.id, nombre: f2.nombre, valor: f2.valor });
+      });
+    }
+
+    state.items = rawItems.map(function(i){
+      return {
+        id: i.id,
+        identificacionTercero: i.identificacion_tercero,
+        nombreTercero: i.nombre_tercero,
+        actividad: i.actividad,
+        servicioContratar: i.servicio_contratar,
+        objeto: i.objeto,
+        bpin: i.bpin,
+        indicador: i.indicador,
+        tipoContrato: i.tipo_contrato,
+        modalidadSeleccion: i.modalidad_seleccion,
+        formaPago: i.forma_pago,
+        fechaInicio: i.fecha_inicio,
+        fechaFin: i.fecha_fin,
+        honorarios: i.honorarios,
+        total: Number(i.total) || 0,
+        vigenciaFutura: i.vigencia_futura,
+        justTecnica: i.justificacion_tecnica,
+        justJuridica: i.justificacion_juridica,
+        articuloLey: i.articulo_ley,
+        fuentes: fuentesByItem[i.id] || []
+      };
+    });
+
+    renderAll();
+    subscribeRealtimeCaptura();
+  }
+
+  function subscribeRealtimeCaptura(){
+    if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+    realtimeChannel = sb.channel("priorizacion-" + currentSecretariaId)
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items", filter: "secretaria_id=eq." + currentSecretariaId }, function(){ loadSecretariaData(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas", filter: "secretaria_id=eq." + currentSecretariaId }, function(){ loadSecretariaData(); })
+      .subscribe();
+  }
+
+  // ---------- Render ----------
+  function isLocked(){
+    return state.status === "enviado" && profile.role !== "admin";
+  }
+
+  function renderTopControls(){
+    var enviado = state.status === "enviado";
+    els.statusPill.className = "status-pill " + (enviado ? "status-enviado" : "status-borrador");
+    els.statusPill.textContent = enviado ? "✔ Enviado" : "● Borrador";
+    els.enviadoBanner.style.display = enviado ? "flex" : "none";
+    els.btnReabrir.style.display = (enviado && profile.role === "admin") ? "inline-flex" : "none";
+    els.btnAdd.disabled = isLocked();
+    els.btnEnviar.disabled = enviado || state.items.length === 0;
+  }
+
+  function renderStats(){
+    els.statCount.textContent = state.items.length;
+    var total = state.items.reduce(function(s,i){ return s + (Number(i.total)||0); },0);
+    els.statTotal.textContent = fmtCOP(total);
+    els.statPS.textContent = state.items.filter(function(i){ return i.tipoContrato === "prestacion"; }).length;
+  }
+
+  function renderItems(){
+    els.itemsList.innerHTML = "";
+    if (state.items.length === 0){
+      els.emptyState.style.display = "block";
+      return;
+    }
+    els.emptyState.style.display = "none";
+    var locked = isLocked();
+
+    state.items.forEach(function(item){
+      var card = document.createElement("div");
+      card.className = "item-card";
+
+      var top = document.createElement("div");
+      top.className = "item-top";
+
+      var left = document.createElement("div");
+      left.innerHTML =
+        '<div class="item-objeto">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
+        '<div class="item-tags">' +
+          '<span class="tag">' + escapeHtml(item.servicioContratar || "Servicio no definido") + '</span>' +
+          '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
+          (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
+          (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
+        '</div>';
+
+      var actions = document.createElement("div");
+      actions.className = "item-actions";
+      var editBtn = document.createElement("button");
+      editBtn.className = "btn btn-ghost btn-sm";
+      editBtn.textContent = locked ? "Ver" : "Editar";
+      editBtn.onclick = function(){ openModal(item.id); };
+      actions.appendChild(editBtn);
+      if (!locked){
+        var delBtn = document.createElement("button");
+        delBtn.className = "btn btn-danger-text btn-sm";
+        delBtn.textContent = "Eliminar";
+        delBtn.onclick = async function(){
+          if (!confirm("¿Eliminar esta necesidad de la lista?")) return;
+          var res = await sb.rpc("eliminar_necesidad", { p_item_id: item.id });
+          if (res.error){ alert("No se pudo eliminar: " + res.error.message); return; }
+          await loadSecretariaData();
+        };
+        actions.appendChild(delBtn);
+      }
+
+      top.appendChild(left);
+      top.appendChild(actions);
+
+      var bottom = document.createElement("div");
+      bottom.className = "item-bottom";
+      var dias = calcDiasInclusive(item.fechaInicio, item.fechaFin);
+      bottom.innerHTML =
+        '<span>' + (item.fechaInicio || "—") + ' → ' + (item.fechaFin || "—") + ' (' + dias + ' días)</span>' +
+        '<span>Fuentes: ' + (item.fuentes ? item.fuentes.length : 0) + '</span>' +
+        '<span class="total">' + fmtCOP(item.total) + '</span>';
+
+      card.appendChild(top);
+      card.appendChild(bottom);
+      els.itemsList.appendChild(card);
+    });
+  }
+
+  function renderAll(){
+    renderTopControls();
+    renderStats();
+    renderItems();
+  }
+
+  // ---------- Panel del alcalde: tablero con gráficas ----------
+  var PALETTE = ["#1e3a8a","#2563eb","#0f7a3d","#b45309","#7c3aed","#0891b2","#be123c","#4d7c0f","#a16207","#334155","#0369a1","#c2410c","#166534","#6d28d9","#9d174d","#065f46","#78350f","#1f2937"];
+  function colorAt(i){ return PALETTE[i % PALETTE.length]; }
+  var charts = {};
+  function upsertChart(canvasId, config){
+    if (charts[canvasId]){ charts[canvasId].destroy(); }
+    var ctx = document.getElementById(canvasId).getContext("2d");
+    charts[canvasId] = new Chart(ctx, config);
+  }
+
+  async function loadDashboard(){
+    var resumenRes = await sb.from("priorizacion_resumen").select("*").order("total_proyectado", { ascending: false });
+    var resumen = resumenRes.data || [];
+
+    var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar");
+    var items = itemsRes.data || [];
+
+    var totalGeneral = resumen.reduce(function(s,r){ return s + Number(r.total_proyectado||0); }, 0);
+    var enviadas = resumen.filter(function(r){ return r.status === "enviado"; }).length;
+    var totalNecesidades = resumen.reduce(function(s,r){ return s + Number(r.total_items||0); }, 0);
+
+    document.getElementById("dashTotalProyectado").textContent = fmtCOP(totalGeneral);
+    document.getElementById("dashEnviadas").textContent = enviadas + " / " + resumen.length;
+    document.getElementById("dashNecesidades").textContent = totalNecesidades;
+
+    var conDatos = resumen.filter(function(r){ return Number(r.total_items||0) > 0; });
+    var labelsSec = conDatos.map(function(r){ return r.secretaria_nombre; });
+
+    upsertChart("chartTotalPorSecretaria", {
+      type: "bar",
+      data: {
+        labels: labelsSec,
+        datasets: [{ label: "Total proyectado", data: conDatos.map(function(r){ return Number(r.total_proyectado||0); }), backgroundColor: labelsSec.map(function(_,i){ return colorAt(i); }) }]
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label: function(ctx){ return fmtCOP(ctx.parsed.x); } } } },
+        scales:{ x:{ ticks:{ callback: function(v){ return fmtCOP(v); } } } }
+      }
+    });
+
+    upsertChart("chartNecesidadesPorSecretaria", {
+      type: "bar",
+      data: {
+        labels: labelsSec,
+        datasets: [{ label: "Necesidades", data: conDatos.map(function(r){ return Number(r.total_items||0); }), backgroundColor: labelsSec.map(function(_,i){ return colorAt(i+3); }) }]
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins:{ legend:{ display:false } },
+        scales:{ x:{ ticks:{ precision:0 } } }
+      }
+    });
+
+    upsertChart("chartEstadoEnvio", {
+      type: "doughnut",
+      data: {
+        labels: ["Enviado","Borrador"],
+        datasets: [{ data: [enviadas, resumen.length - enviadas], backgroundColor: ["#0f7a3d","#b45309"] }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:"bottom" } } }
+    });
+
+    var servicioCounts = {};
+    items.forEach(function(it){
+      var key = it.servicio_contratar || "Sin especificar";
+      servicioCounts[key] = (servicioCounts[key]||0) + 1;
+    });
+    var servicioLabels = Object.keys(servicioCounts);
+    upsertChart("chartServicio", {
+      type: "doughnut",
+      data: {
+        labels: servicioLabels.length ? servicioLabels : ["Sin datos"],
+        datasets: [{ data: servicioLabels.length ? servicioLabels.map(function(k){ return servicioCounts[k]; }) : [1], backgroundColor: servicioLabels.length ? servicioLabels.map(function(_,i){ return colorAt(i+6); }) : ["#e2e5ec"] }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:"bottom" } } }
+    });
+
+    var el = document.getElementById("alcaldeTable");
+    el.innerHTML = resumen.map(function(r){
+      var enviado = r.status === "enviado";
+      var pillClass = enviado ? "status-enviado" : "status-borrador";
+      var pillText = enviado ? "✔ Enviado" : "● Borrador";
+      return '<div class="item-card"><div class="item-top">' +
+        '<div><div class="item-objeto">' + escapeHtml(r.secretaria_nombre) + '</div>' +
+        '<div class="item-tags"><span class="status-pill ' + pillClass + '">' + pillText + '</span>' +
+        '<span class="tag">' + (r.total_items||0) + ' necesidades</span>' +
+        '<span class="tag">' + (r.total_prestacion_servicios||0) + ' de prestación de servicios</span></div></div>' +
+        '<div class="total" style="font-weight:800;font-size:1rem;">' + fmtCOP(r.total_proyectado) + '</div>' +
+        '</div></div>';
+    }).join("") || "<p>No hay datos todavía.</p>";
+  }
+
+  async function renderAlcaldeView(){
+    await loadDashboard();
+    if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+    realtimeChannel = sb.channel("alcalde-dashboard")
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ loadDashboard(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas" }, function(){ loadDashboard(); })
+      .subscribe();
+  }
+
+  // ---------- Panel de administración ----------
+  async function renderAdminOverview(){
+    var res = await sb.from("priorizacion_resumen").select("*").order("secretaria_nombre");
+    var el = document.getElementById("adminOverviewTable");
+    var totalBox = document.getElementById("adminOverviewTotalBox");
+    if (res.error){ el.innerHTML = "<p>No se pudo cargar el panel.</p>"; return; }
+    var data = res.data || [];
+    var totalGeneral = data.reduce(function(s,r){ return s + Number(r.total_proyectado||0); }, 0);
+    var enviadas = data.filter(function(r){ return r.status === "enviado"; }).length;
+    totalBox.textContent = enviadas + " de " + data.length + " secretarías enviaron su lista · Total: " + fmtCOP(totalGeneral);
+
+    el.innerHTML = data.map(function(r){
+      var enviado = r.status === "enviado";
+      var pillClass = enviado ? "status-enviado" : "status-borrador";
+      var pillText = enviado ? "✔ Enviado" : "● Borrador";
+      var isActive = r.secretaria_id === currentSecretariaId;
+      return '<div class="item-card" data-row="' + r.secretaria_id + '" style="' + (isActive ? "border:2px solid var(--navy-800);" : "") + '">' +
+        '<div class="item-top">' +
+        '<div><div class="item-objeto">' + escapeHtml(r.secretaria_nombre) + '</div>' +
+        '<div class="item-tags"><span class="status-pill ' + pillClass + '">' + pillText + '</span>' +
+        '<span class="tag">' + (r.total_items||0) + ' necesidades</span></div></div>' +
+        '<div style="display:flex;align-items:center;gap:.8rem;">' +
+        '<div class="total" style="font-weight:800;">' + fmtCOP(r.total_proyectado) + '</div>' +
+        '<div style="display:flex;gap:.4rem;">' +
+        (enviado ? '<button type="button" class="btn btn-ghost btn-sm" data-reabrir="' + r.secretaria_id + '">Reabrir</button>' : '') +
+        '<button type="button" class="btn btn-primary btn-sm" data-editar="' + r.secretaria_id + '">Editar</button>' +
+        '</div></div></div></div>';
+    }).join("") || "<p>No hay secretarías registradas.</p>";
+
+    el.querySelectorAll("[data-editar]").forEach(function(btn){
+      btn.addEventListener("click", async function(){
+        currentSecretariaId = btn.getAttribute("data-editar");
+        els.secretariaSelect.value = currentSecretariaId;
+        highlightAdminOverviewRow();
+        await loadSecretariaData();
+        document.getElementById("captureCard").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+    el.querySelectorAll("[data-reabrir]").forEach(function(btn){
+      btn.addEventListener("click", async function(){
+        var secId = btn.getAttribute("data-reabrir");
+        var res2 = await sb.rpc("reabrir_lista", { p_secretaria_id: secId });
+        if (res2.error){ alert("No se pudo reabrir: " + res2.error.message); return; }
+        if (secId === currentSecretariaId){ await loadSecretariaData(); }
+      });
+    });
+  }
+
+  function highlightAdminOverviewRow(){
+    document.querySelectorAll("#adminOverviewTable [data-row]").forEach(function(row){
+      row.style.border = row.getAttribute("data-row") === currentSecretariaId ? "2px solid var(--navy-800)" : "1px solid var(--line)";
+    });
+  }
+
+  function subscribeRealtimeOverview(){
+    if (realtimeChannelOverview){ sb.removeChannel(realtimeChannelOverview); realtimeChannelOverview = null; }
+    realtimeChannelOverview = sb.channel("admin-overview")
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ renderAdminOverview(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas" }, function(){ renderAdminOverview(); })
+      .subscribe();
+  }
+
+  // ---------- Modal: agregar / editar ----------
+  var f = {
+    identificacion: document.getElementById("f_identificacion"),
+    nombre: document.getElementById("f_nombre"),
+    actividad: document.getElementById("f_actividad"),
+    servicio: document.getElementById("f_servicio"),
+    objeto: document.getElementById("f_objeto"),
+    bpin: document.getElementById("f_bpin"),
+    indicador: document.getElementById("f_indicador"),
+    tipo: document.getElementById("f_tipo"),
+    modalidad: document.getElementById("f_modalidad"),
+    formapago: document.getElementById("f_formapago"),
+    inicio: document.getElementById("f_inicio"),
+    fin: document.getElementById("f_fin"),
+    dias: document.getElementById("f_dias"),
+    honorarios: document.getElementById("f_honorarios"),
+    total: document.getElementById("f_total"),
+    justTecnica: document.getElementById("f_just_tecnica"),
+    justJuridica: document.getElementById("f_just_juridica"),
+    articulo: document.getElementById("f_articulo")
+  };
+
+  fillSelect(f.servicio, SERVICIOS);
+  fillSelect(f.bpin, BPIN_OPTIONS);
+  fillSelect(f.indicador, INDICADOR_OPTIONS);
+  fillSelect(f.tipo, TIPOS_CONTRATO);
+  fillSelect(f.modalidad, MODALIDADES);
+  fillSelect(f.formapago, FORMAS_PAGO);
+
+  function updateDiasYTotal(){
+    var dias = calcDiasInclusive(f.inicio.value, f.fin.value);
+    f.dias.value = dias ? (dias + " días") : "0 días";
+    var esPrestacion = f.tipo.value === "prestacion";
+    document.getElementById("honorariosRow").style.opacity = esPrestacion ? "1" : ".55";
+    f.honorarios.disabled = !esPrestacion;
+
+    if (esPrestacion){
+      var hon = Number(onlyDigits(f.honorarios.value)) || 0;
+      var total = dias ? Math.round(hon * (dias/30)) : 0;
+      f.total.value = total ? total.toLocaleString("es-CO") : "";
+      f.total.disabled = true;
+      document.getElementById("totalHint").textContent = "Cálculo automático: honorarios mensuales × (días ÷ 30).";
+    } else {
+      f.total.disabled = false;
+      document.getElementById("totalHint").textContent = "Ingrese el valor total proyectado del contrato.";
+    }
+    renderFuentesTotal();
+  }
+
+  ["input","change"].forEach(function(evt){
+    f.inicio.addEventListener(evt, updateDiasYTotal);
+    f.fin.addEventListener(evt, updateDiasYTotal);
+    f.tipo.addEventListener(evt, updateDiasYTotal);
+    f.honorarios.addEventListener(evt, updateDiasYTotal);
+    f.total.addEventListener(evt, renderFuentesTotal);
+  });
+
+  // Fuentes de financiación
+  var fuentesListEl = document.getElementById("fuentesList");
+  function renderFuentes(){
+    fuentesListEl.innerHTML = "";
+    fuentesDraft.forEach(function(row, idx){
+      var line = document.createElement("div");
+      line.className = "fuente-row";
+      line.innerHTML =
+        '<input type="text" placeholder="Nombre de la fuente (ej: SGP, ICLD, Recursos propios)" value="' + escapeHtml(row.nombre) + '" data-idx="' + idx + '" data-field="nombre">' +
+        '<input type="text" inputmode="numeric" placeholder="Valor" value="' + (row.valor ? Number(row.valor).toLocaleString("es-CO") : "") + '" data-idx="' + idx + '" data-field="valor">' +
+        '<button type="button" class="btn btn-danger-text btn-sm" data-remove="' + idx + '">×</button>';
+      fuentesListEl.appendChild(line);
+    });
+    fuentesListEl.querySelectorAll("input").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var idx = Number(inp.getAttribute("data-idx"));
+        var field = inp.getAttribute("data-field");
+        if (field === "valor"){ fuentesDraft[idx].valor = onlyDigits(inp.value); }
+        else { fuentesDraft[idx].nombre = inp.value; }
+        renderFuentesTotal();
+      });
+    });
+    fuentesListEl.querySelectorAll("[data-remove]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        fuentesDraft.splice(Number(btn.getAttribute("data-remove")),1);
+        renderFuentes(); renderFuentesTotal();
+      });
+    });
+  }
+  document.getElementById("btnAddFuente").addEventListener("click", function(){
+    fuentesDraft.push({ id: uid(), nombre:"", valor:"" });
+    renderFuentes();
+  });
+
+  function renderFuentesTotal(){
+    var box = document.getElementById("fuentesTotalBox");
+    var sumaFuentes = fuentesDraft.reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var total = Number(onlyDigits(f.total.value)) || 0;
+    var diff = total - sumaFuentes;
+    if (fuentesDraft.length === 0){
+      box.className = "fuentes-total";
+      box.style.background = "var(--navy-050)";
+      box.textContent = "Agregue al menos una fuente de financiación.";
+      return;
+    }
+    if (diff === 0 && total > 0){
+      box.className = "fuentes-total fuentes-ok";
+      box.innerHTML = "✓ La suma de fuentes coincide con el total: " + fmtCOP(sumaFuentes);
+    } else {
+      box.className = "fuentes-total fuentes-bad";
+      box.innerHTML = "Suma de fuentes: " + fmtCOP(sumaFuentes) + " — faltan/sobran " + fmtCOP(Math.abs(diff)) + " frente al total (" + fmtCOP(total) + ")";
+    }
+  }
+
+  function clearErrors(){
+    ["objeto","bpin","indicador"].forEach(function(k){
+      document.getElementById("err_"+k).textContent = "";
+    });
+  }
+
+  function openModal(itemId){
+    editingId = itemId || null;
+    clearErrors();
+    var locked = isLocked();
+    els.modalTitle.textContent = editingId ? (locked ? "Ver necesidad" : "Editar necesidad") : "Agregar necesidad de contratación";
+
+    var item = editingId ? state.items.find(function(i){ return i.id === editingId; }) : null;
+
+    f.identificacion.value = item ? item.identificacionTercero || "" : "";
+    f.nombre.value = item ? item.nombreTercero || "" : "";
+    f.actividad.value = item ? item.actividad || "" : "";
+    f.servicio.value = item ? item.servicioContratar || "" : "";
+    f.objeto.value = item ? item.objeto || "" : "";
+    f.bpin.value = item ? item.bpin || "" : "";
+    f.indicador.value = item ? item.indicador || "" : "";
+    f.tipo.value = item ? item.tipoContrato || "" : "";
+    f.modalidad.value = item ? item.modalidadSeleccion || "" : "";
+    f.formapago.value = item ? item.formaPago || "" : "";
+    f.inicio.value = item ? item.fechaInicio || "" : "";
+    f.fin.value = item ? item.fechaFin || "" : "";
+    f.honorarios.value = item && item.honorarios ? Number(item.honorarios).toLocaleString("es-CO") : "";
+    f.total.value = item && item.total ? Number(item.total).toLocaleString("es-CO") : "";
+    f.justTecnica.value = item ? item.justTecnica || "" : "";
+    f.justJuridica.value = item ? item.justJuridica || "" : "";
+    f.articulo.value = item ? item.articuloLey || "" : "";
+    document.querySelector('input[name="f_vigencia"][value="' + (item ? (item.vigenciaFutura||"no") : "no") + '"]').checked = true;
+
+    fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return {id:x.id||uid(), nombre:x.nombre, valor:x.valor}; }) : [];
+
+    var allInputs = document.querySelectorAll("#modalBody input, #modalBody select, #modalBody textarea, #btnAddFuente");
+    allInputs.forEach(function(el){ el.disabled = locked; });
+    document.getElementById("btnSaveItem").style.display = locked ? "none" : "inline-flex";
+
+    renderFuentes();
+    updateDiasYTotal();
+    renderFuentesTotal();
+
+    els.overlay.classList.add("open");
+  }
+  function closeModal(){ els.overlay.classList.remove("open"); editingId = null; }
+
+  document.getElementById("btnCloseModal").addEventListener("click", closeModal);
+  document.getElementById("btnCancelModal").addEventListener("click", closeModal);
+  els.overlay.addEventListener("click", function(e){ if (e.target === els.overlay) closeModal(); });
+  els.btnAdd.addEventListener("click", function(){ openModal(null); });
+
+  document.getElementById("btnSaveItem").addEventListener("click", async function(){
+    clearErrors();
+    var valid = true;
+    if (!f.objeto.value.trim()){ document.getElementById("err_objeto").textContent = "El objeto es obligatorio."; valid = false; }
+    if (!f.bpin.value){ document.getElementById("err_bpin").textContent = "Seleccione un BPIN."; valid = false; }
+    if (!f.indicador.value){ document.getElementById("err_indicador").textContent = "Seleccione un indicador."; valid = false; }
+    if (!f.tipo.value || !f.modalidad.value || !f.formapago.value || !f.inicio.value || !f.fin.value){
+      valid = false;
+      alert("Complete tipo de contrato, modalidad, forma de pago y fechas.");
+    }
+    var totalVal = Number(onlyDigits(f.total.value)) || 0;
+    if (totalVal === 0){
+      valid = false;
+      alert("Ingrese el total proyectado del contrato" + (f.tipo.value !== "prestacion" ? " (obligatorio cuando el tipo de contrato no es prestación de servicios)." : "."));
+    } else if (fuentesDraft.length === 0){
+      valid = false;
+      alert("Agregue al menos una fuente de financiación.");
+    } else {
+      var sumaFuentes = fuentesDraft.reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+      if (sumaFuentes !== totalVal){
+        valid = false;
+        alert("La suma de las fuentes de financiación (" + fmtCOP(sumaFuentes) + ") debe ser exactamente igual al total del contrato (" + fmtCOP(totalVal) + "). Ajuste los valores por fuente antes de guardar.");
+      }
+    }
+    if (!valid) return;
+
+    var payloadItem = {
+      id: editingId || null,
+      secretaria_id: currentSecretariaId,
+      identificacion_tercero: onlyDigits(f.identificacion.value),
+      nombre_tercero: f.nombre.value.trim(),
+      actividad: f.actividad.value.trim(),
+      objeto: f.objeto.value.trim(),
+      servicio_contratar: f.servicio.value,
+      bpin: f.bpin.value,
+      indicador: f.indicador.value,
+      tipo_contrato: f.tipo.value,
+      modalidad_seleccion: f.modalidad.value,
+      forma_pago: f.formapago.value,
+      fecha_inicio: f.inicio.value,
+      fecha_fin: f.fin.value,
+      honorarios: onlyDigits(f.honorarios.value) || null,
+      total: totalVal,
+      vigencia_futura: document.querySelector('input[name="f_vigencia"]:checked').value,
+      justificacion_tecnica: f.justTecnica.value.trim(),
+      justificacion_juridica: f.justJuridica.value.trim(),
+      articulo_ley: f.articulo.value.trim()
+    };
+    var payloadFuentes = fuentesDraft.map(function(r){ return { nombre: r.nombre.trim(), valor: Number(r.valor)||0 }; });
+
+    var saveBtn = document.getElementById("btnSaveItem");
+    saveBtn.disabled = true; saveBtn.textContent = "Guardando...";
+    var res = await sb.rpc("guardar_necesidad", { p_item: payloadItem, p_fuentes: payloadFuentes });
+    saveBtn.disabled = false; saveBtn.textContent = "Guardar necesidad";
+
+    if (res.error){
+      alert("No se pudo guardar: " + res.error.message);
+      return;
+    }
+    closeModal();
+    await loadSecretariaData();
+  });
+
+  // ---------- Enviar lista / reabrir ----------
+  els.btnEnviar.addEventListener("click", async function(){
+    if (state.items.length === 0) return;
+    if (!confirm("¿Enviar la lista definitiva de " + secretariaNombre(currentSecretariaId) + "? Después de enviarla no podrá editarla usted mismo.")) return;
+    var res = await sb.rpc("enviar_lista", { p_secretaria_id: currentSecretariaId });
+    if (res.error){ alert("No se pudo enviar: " + res.error.message); return; }
+    await loadSecretariaData();
+  });
+
+  els.btnReabrir.addEventListener("click", async function(){
+    var res = await sb.rpc("reabrir_lista", { p_secretaria_id: currentSecretariaId });
+    if (res.error){ alert("No se pudo reabrir: " + res.error.message); return; }
+    await loadSecretariaData();
+  });
+
+  // ---------- Init ----------
+  init();
+})();
+</script>
+</body>
+</html>
