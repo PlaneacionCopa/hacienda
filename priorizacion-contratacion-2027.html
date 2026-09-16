@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Priorización de Contratación 2027</title>
+<title> Contratación 2027</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
 <style>
   :root{
     --navy-900:#152a5c;
@@ -242,7 +242,7 @@
   <div class="card login-card">
     <div class="login-head">
       <div class="badge-shield">🏛️</div>
-      <h1>Priorización de Contratación 2027</h1>
+      <h1>Contratación 2027</h1>
       <p>Ingresa con tu correo institucional</p>
     </div>
     <form class="login-form" id="loginForm">
@@ -1370,6 +1370,13 @@
   function colorAt(i){ return PALETTE[i % PALETTE.length]; }
   var charts = {};
   function upsertChart(canvasId, config){
+    if (typeof Chart === "undefined"){
+      var canvasEl = document.getElementById(canvasId);
+      if (canvasEl && canvasEl.parentElement){
+        canvasEl.parentElement.innerHTML = '<p style="padding:1rem;color:var(--ink-soft);font-size:.82rem;">No se pudo cargar la librería de gráficas. Verifica tu conexión o desactiva bloqueadores para este sitio.</p>';
+      }
+      return;
+    }
     if (charts[canvasId]){ charts[canvasId].destroy(); }
     var ctx = document.getElementById(canvasId).getContext("2d");
     charts[canvasId] = new Chart(ctx, config);
