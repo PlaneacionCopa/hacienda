@@ -1591,7 +1591,7 @@
       div.innerHTML =
         '<span title="' + escapeHtml(labelFromOptions(INDICADOR_OPTIONS, codigo)) + '">' + escapeHtml(codigo) + '</span>' +
         '<input type="number" min="0" max="100" step="0.01" placeholder="%" value="' + escapeHtml(String(pctVal)) + '" data-pct-idx="' + idx + '">' +
-        '<span class="ind-total">' + fmtCOP(totalFila) + '</span>' +
+        '<span class="ind-total" data-total-idx="' + idx + '">' + fmtCOP(totalFila) + '</span>' +
         '<button type="button" data-remove-ind="' + idx + '">×</button>';
       el.appendChild(div);
     });
@@ -1600,7 +1600,7 @@
       inp.addEventListener("input", function(){
         var idx = Number(inp.getAttribute("data-pct-idx"));
         indicadorDraft[idx].porcentaje = inp.value;
-        renderIndicadorChosen();
+        updateIndicadorTotalsOnly();
       });
     });
     el.querySelectorAll("[data-remove-ind]").forEach(function(btn){
@@ -1610,6 +1610,21 @@
       });
     });
 
+    renderIndicadorPctBox();
+  }
+
+  // Actualiza solo los montos calculados y el resumen, sin recrear los inputs
+  // (evita que el campo pierda el foco mientras se escribe el %)
+  function updateIndicadorTotalsOnly(){
+    var totalContrato = Number(onlyDigits(f.total.value)) || 0;
+    var el = document.getElementById("indicadorChosen");
+    el.querySelectorAll("[data-total-idx]").forEach(function(span){
+      var idx = Number(span.getAttribute("data-total-idx"));
+      var row = indicadorDraft[idx];
+      var pctVal = row && row.porcentaje !== "" ? Number(row.porcentaje) || 0 : 0;
+      var totalFila = Math.round((pctVal/100) * totalContrato);
+      span.textContent = fmtCOP(totalFila);
+    });
     renderIndicadorPctBox();
   }
 
@@ -1676,7 +1691,7 @@
     f.fin.addEventListener(evt, updateDiasYTotal);
     f.tipo.addEventListener(evt, updateDiasYTotal);
     f.honorarios.addEventListener(evt, updateDiasYTotal);
-    f.total.addEventListener(evt, function(){ renderFuentesTotal(); renderIndicadorChosen(); });
+    f.total.addEventListener(evt, function(){ renderFuentesTotal(); updateIndicadorTotalsOnly(); });
   });
 
   // Fuentes de financiación
