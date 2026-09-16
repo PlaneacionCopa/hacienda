@@ -194,6 +194,24 @@
 
   .disabled-note{font-size:.78rem;color:var(--ink-soft);font-style:italic;}
 
+  .chosen-chip{
+    display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;
+    background:var(--navy-050);border:1px solid var(--line);border-radius:8px;
+    padding:.45rem .6rem;font-size:.8rem;line-height:1.3;
+  }
+  .chosen-chip button{
+    background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;
+    line-height:1;flex-shrink:0;padding:0 .15rem;
+  }
+
+  .indicador-row{
+    display:grid;grid-template-columns:1fr 80px 130px 34px;gap:.5rem;align-items:center;
+    font-size:.82rem;background:var(--navy-050);border:1px solid var(--line);
+    border-radius:8px;padding:.4rem .6rem;
+  }
+  .indicador-row input{padding:.35rem .5rem;font-size:.8rem;}
+  .indicador-row .ind-total{font-weight:700;text-align:right;padding-right:.3rem;}
+
   .login-wrap{
     min-height:80vh;display:flex;align-items:center;justify-content:center;
   }
@@ -417,12 +435,15 @@
           <div class="field">
             <label for="f_bpin" class="req">BPIN</label>
             <select id="f_bpin"></select>
+            <div id="bpinChosen" style="margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;"></div>
             <div class="error-text" id="err_bpin"></div>
           </div>
           <div class="field">
             <label for="f_indicador" class="req">Indicador</label>
             <select id="f_indicador"></select>
-            <div class="hint">Se listan solo indicadores pendientes por cumplir.</div>
+            <div class="hint">Se listan solo indicadores pendientes por cumplir. Asigne el % de cada uno.</div>
+            <div id="indicadorChosen" style="margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;"></div>
+            <div class="fuentes-total" id="indicadorPctBox" style="margin-top:.3rem;"></div>
             <div class="error-text" id="err_indicador"></div>
           </div>
         </div>
@@ -462,9 +483,9 @@
 
         <div class="grid2" id="honorariosRow" style="margin-top:.9rem;">
           <div class="field">
-            <label for="f_honorarios">Honorarios</label>
+            <label for="f_honorarios">Honorarios mensuales</label>
             <input id="f_honorarios" inputmode="numeric" placeholder="Ej: 3.000.000">
-            <div class="hint" id="honorariosHint">Valor total pactado con el contratista para todo el contrato (no aplica escala salarial de funcionarios).</div>
+            <div class="hint" id="honorariosHint">Valor mensual pactado con el contratista (no aplica escala salarial de funcionarios).</div>
           </div>
           <div class="field">
             <label for="f_total" class="req">Total proyección del contrato</label>
@@ -1009,6 +1030,17 @@
     var dias = Math.round((fin - inicio)/(24*60*60*1000)) + 1;
     return dias > 0 ? dias : 0;
   }
+  // DAYS360 estilo Excel (método US/NASD), igual al que usa la hoja de cálculo
+  function days360(inicioStr, finStr){
+    if(!inicioStr || !finStr) return 0;
+    var pi = inicioStr.split("-").map(Number), pf = finStr.split("-").map(Number);
+    var y1=pi[0], m1=pi[1]-1, d1=pi[2];
+    var y2=pf[0], m2=pf[1]-1, d2=pf[2];
+    if (d1 === 31) d1 = 30;
+    if (d2 === 31 && d1 === 30) d2 = 30;
+    var total = (y2-y1)*360 + (m2-m1)*30 + (d2-d1);
+    return total > 0 ? total : 0;
+  }
   function fillSelect(sel, opts, placeholder){
     sel.innerHTML = "";
     var ph = document.createElement("option");
@@ -1036,6 +1068,8 @@
   var state = { status: "borrador", items: [] };
   var editingId = null;
   var fuentesDraft = [];
+  var bpinDraft = [];
+  var indicadorDraft = [];
   var realtimeChannel = null;
   var realtimeChannelOverview = null;
 
@@ -1209,8 +1243,8 @@
         actividad: i.actividad,
         servicioContratar: i.servicio_contratar,
         objeto: i.objeto,
-        bpin: i.bpin,
-        indicador: i.indicador,
+        bpin: i.bpin || [],
+        indicador: i.indicador || [],
         tipoContrato: i.tipo_contrato,
         modalidadSeleccion: i.modalidad_seleccion,
         formaPago: i.forma_pago,
@@ -1284,6 +1318,8 @@
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
+          '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' +
+          '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' +
         '</div>';
 
       var actions = document.createElement("div");
@@ -1518,6 +1554,97 @@
   fillSelect(f.servicio, SERVICIOS);
   fillSelect(f.bpin, BPIN_OPTIONS);
   fillSelect(f.indicador, INDICADOR_OPTIONS);
+
+  function labelFromOptions(opts, code){
+    var f2 = opts.find(function(o){ return o.v === code; });
+    return f2 ? f2.l : code;
+  }
+  function renderChosenList(containerId, draft, opts){
+    var el = document.getElementById(containerId);
+    el.innerHTML = "";
+    draft.forEach(function(code, idx){
+      var row = document.createElement("div");
+      row.className = "chosen-chip";
+      row.innerHTML = '<span>' + escapeHtml(labelFromOptions(opts, code)) + '</span><button type="button" data-idx="' + idx + '">×</button>';
+      el.appendChild(row);
+    });
+    el.querySelectorAll("button[data-idx]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        draft.splice(Number(btn.getAttribute("data-idx")), 1);
+        renderChosenList(containerId, draft, opts);
+      });
+    });
+  }
+  function renderBpinChosen(){ renderChosenList("bpinChosen", bpinDraft, BPIN_OPTIONS); }
+
+  function renderIndicadorChosen(){
+    var el = document.getElementById("indicadorChosen");
+    el.innerHTML = "";
+    var totalContrato = Number(onlyDigits(f.total.value)) || 0;
+
+    indicadorDraft.forEach(function(row, idx){
+      var codigo = row.codigo;
+      var div = document.createElement("div");
+      div.className = "indicador-row";
+      var pctVal = row.porcentaje === "" || row.porcentaje === null || row.porcentaje === undefined ? "" : row.porcentaje;
+      var totalFila = pctVal !== "" ? Math.round((Number(pctVal)/100) * totalContrato) : 0;
+      div.innerHTML =
+        '<span title="' + escapeHtml(labelFromOptions(INDICADOR_OPTIONS, codigo)) + '">' + escapeHtml(codigo) + '</span>' +
+        '<input type="number" min="0" max="100" step="0.01" placeholder="%" value="' + escapeHtml(String(pctVal)) + '" data-pct-idx="' + idx + '">' +
+        '<span class="ind-total">' + fmtCOP(totalFila) + '</span>' +
+        '<button type="button" data-remove-ind="' + idx + '">×</button>';
+      el.appendChild(div);
+    });
+
+    el.querySelectorAll("[data-pct-idx]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var idx = Number(inp.getAttribute("data-pct-idx"));
+        indicadorDraft[idx].porcentaje = inp.value;
+        renderIndicadorChosen();
+      });
+    });
+    el.querySelectorAll("[data-remove-ind]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        indicadorDraft.splice(Number(btn.getAttribute("data-remove-ind")), 1);
+        renderIndicadorChosen();
+      });
+    });
+
+    renderIndicadorPctBox();
+  }
+
+  function renderIndicadorPctBox(){
+    var box = document.getElementById("indicadorPctBox");
+    if (indicadorDraft.length === 0){
+      box.className = "fuentes-total";
+      box.style.background = "var(--navy-050)";
+      box.textContent = "Agregue al menos un indicador y asigne su % de participación.";
+      return;
+    }
+    var sumaPct = indicadorDraft.reduce(function(s,r){ return s + (Number(r.porcentaje)||0); }, 0);
+    var sumaRedondeada = Math.round(sumaPct * 100) / 100;
+    if (sumaRedondeada === 100){
+      box.className = "fuentes-total fuentes-ok";
+      box.innerHTML = "✓ Los porcentajes suman 100%";
+    } else {
+      box.className = "fuentes-total fuentes-bad";
+      box.innerHTML = "Suma actual: " + sumaRedondeada + "% — debe sumar exactamente 100% (faltan/sobran " + (100 - sumaRedondeada).toFixed(2) + ")";
+    }
+  }
+
+  f.bpin.addEventListener("change", function(){
+    var val = f.bpin.value;
+    if (val && bpinDraft.indexOf(val) === -1){ bpinDraft.push(val); renderBpinChosen(); }
+    f.bpin.value = "";
+  });
+  f.indicador.addEventListener("change", function(){
+    var val = f.indicador.value;
+    if (val && !indicadorDraft.some(function(r){ return r.codigo === val; })){
+      indicadorDraft.push({ codigo: val, porcentaje: "" });
+      renderIndicadorChosen();
+    }
+    f.indicador.value = "";
+  });
   fillSelect(f.tipo, TIPOS_CONTRATO);
   fillSelect(f.modalidad, MODALIDADES);
   fillSelect(f.formapago, FORMAS_PAGO);
@@ -1531,14 +1658,17 @@
 
     if (esPrestacion){
       var hon = Number(onlyDigits(f.honorarios.value)) || 0;
-      f.total.value = hon ? hon.toLocaleString("es-CO") : "";
+      var diasContables = days360(f.inicio.value, f.fin.value);
+      var total = diasContables ? Math.round((hon/30) * diasContables) : 0;
+      f.total.value = total ? total.toLocaleString("es-CO") : "";
       f.total.disabled = true;
-      document.getElementById("totalHint").textContent = "El total corresponde directamente al valor de los honorarios pactados.";
+      document.getElementById("totalHint").textContent = "Cálculo automático: (honorarios ÷ 30) × días contables (base 360) — " + diasContables + " días contables.";
     } else {
       f.total.disabled = false;
       document.getElementById("totalHint").textContent = "Ingrese el valor total proyectado del contrato.";
     }
     renderFuentesTotal();
+    renderIndicadorChosen();
   }
 
   ["input","change"].forEach(function(evt){
@@ -1546,7 +1676,7 @@
     f.fin.addEventListener(evt, updateDiasYTotal);
     f.tipo.addEventListener(evt, updateDiasYTotal);
     f.honorarios.addEventListener(evt, updateDiasYTotal);
-    f.total.addEventListener(evt, renderFuentesTotal);
+    f.total.addEventListener(evt, function(){ renderFuentesTotal(); renderIndicadorChosen(); });
   });
 
   // Fuentes de financiación
@@ -1622,8 +1752,12 @@
     f.actividad.value = item ? item.actividad || "" : "";
     f.servicio.value = item ? item.servicioContratar || "" : "";
     f.objeto.value = item ? item.objeto || "" : "";
-    f.bpin.value = item ? item.bpin || "" : "";
-    f.indicador.value = item ? item.indicador || "" : "";
+    f.bpin.value = "";
+    f.indicador.value = "";
+    bpinDraft = item && item.bpin ? item.bpin.slice() : [];
+    indicadorDraft = item && item.indicador ? item.indicador.map(function(x){ return { codigo: x.codigo, porcentaje: (x.porcentaje === null || x.porcentaje === undefined) ? "" : x.porcentaje }; }) : [];
+    renderBpinChosen();
+    renderIndicadorChosen();
     f.tipo.value = item ? item.tipoContrato || "" : "";
     f.modalidad.value = item ? item.modalidadSeleccion || "" : "";
     f.formapago.value = item ? item.formaPago || "" : "";
@@ -1659,8 +1793,17 @@
     clearErrors();
     var valid = true;
     if (!f.objeto.value.trim()){ document.getElementById("err_objeto").textContent = "El objeto es obligatorio."; valid = false; }
-    if (!f.bpin.value){ document.getElementById("err_bpin").textContent = "Seleccione un BPIN."; valid = false; }
-    if (!f.indicador.value){ document.getElementById("err_indicador").textContent = "Seleccione un indicador."; valid = false; }
+    if (bpinDraft.length === 0){ document.getElementById("err_bpin").textContent = "Seleccione al menos un BPIN."; valid = false; }
+    if (indicadorDraft.length === 0){
+      document.getElementById("err_indicador").textContent = "Seleccione al menos un indicador.";
+      valid = false;
+    } else {
+      var sumaPctInd = Math.round(indicadorDraft.reduce(function(s,r){ return s + (Number(r.porcentaje)||0); }, 0) * 100) / 100;
+      if (sumaPctInd !== 100){
+        document.getElementById("err_indicador").textContent = "Los porcentajes de los indicadores deben sumar exactamente 100% (suma actual: " + sumaPctInd + "%).";
+        valid = false;
+      }
+    }
     if (!f.tipo.value || !f.modalidad.value || !f.formapago.value || !f.inicio.value || !f.fin.value){
       valid = false;
       alert("Complete tipo de contrato, modalidad, forma de pago y fechas.");
@@ -1689,8 +1832,8 @@
       actividad: f.actividad.value.trim(),
       objeto: f.objeto.value.trim(),
       servicio_contratar: f.servicio.value,
-      bpin: f.bpin.value,
-      indicador: f.indicador.value,
+      bpin: bpinDraft,
+      indicador: indicadorDraft.map(function(r){ return { codigo: r.codigo, porcentaje: Number(r.porcentaje)||0 }; }),
       tipo_contrato: f.tipo.value,
       modalidad_seleccion: f.modalidad.value,
       forma_pago: f.formapago.value,
