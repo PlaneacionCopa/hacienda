@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title> 2027</title>
+<title>Priorización de Contratación 2027</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -228,8 +228,8 @@
     </div>
     <form class="login-form" id="loginForm">
       <div class="field">
-        <label for="loginEmail">Correo</label>
-        <input type="email" id="loginEmail" required placeholder="nombre@copacabana.gov.co" autocomplete="username">
+        <label for="loginEmail">Usuario</label>
+        <input type="text" id="loginEmail" required placeholder="hacienda" autocomplete="username">
       </div>
       <div class="field">
         <label for="loginPassword">Contraseña</label>
@@ -653,15 +653,27 @@
 
   document.getElementById("loginForm").addEventListener("submit", async function(e){
     e.preventDefault();
-    var email = document.getElementById("loginEmail").value.trim();
+    var rawInput = document.getElementById("loginEmail").value.trim();
     var pass = document.getElementById("loginPassword").value;
     var errEl = document.getElementById("loginError");
     errEl.textContent = "";
     var btn = document.getElementById("btnLogin");
     btn.disabled = true; btn.textContent = "Ingresando...";
+
+    var email = rawInput;
+    if (rawInput.indexOf("@") === -1){
+      var resolveRes = await sb.rpc("resolver_username", { p_username: rawInput });
+      if (resolveRes.error || !resolveRes.data){
+        btn.disabled = false; btn.textContent = "Iniciar sesión";
+        errEl.textContent = "Usuario o contraseña incorrectos.";
+        return;
+      }
+      email = resolveRes.data;
+    }
+
     var res = await sb.auth.signInWithPassword({ email: email, password: pass });
     btn.disabled = false; btn.textContent = "Iniciar sesión";
-    if (res.error){ errEl.textContent = "Correo o contraseña incorrectos."; return; }
+    if (res.error){ errEl.textContent = "Usuario o contraseña incorrectos."; return; }
     await afterLogin();
   });
 
