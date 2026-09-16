@@ -242,7 +242,7 @@
   <div class="card login-card">
     <div class="login-head">
       <div class="badge-shield">🏛️</div>
-      <h1>Contratación 2027</h1>
+      <h1>Priorización de Contratación 2027</h1>
       <p>Ingresa con tu correo institucional</p>
     </div>
     <form class="login-form" id="loginForm">
@@ -505,8 +505,11 @@
 
       <div>
         <div class="section-label">Fuentes de financiación</div>
+        <div class="field" style="margin-top:.6rem;">
+          <label for="f_fuente">Agregar fuente</label>
+          <select id="f_fuente"></select>
+        </div>
         <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.45rem;"></div>
-        <button type="button" class="btn btn-ghost btn-sm fuente-add" id="btnAddFuente">＋ Agregar fuente</button>
         <div class="fuentes-total" id="fuentesTotalBox"></div>
       </div>
 
@@ -1014,6 +1017,53 @@
     ];
 
   var FORMAS_PAGO = ["Mensual","Pago único"];
+
+  var FUENTES_OPTIONS = [
+    "11001-Ingresos corrientes de libre destinacion",
+    "12002-Alumbrado publico",
+    "12003-Multas de transito",
+    "12004-Sobretasa ambiental Corantioquia",
+    "12005-Sobretasa ambiental Literal A y B",
+    "12006-Multas código nacional de policía y convivencia",
+    "12007-Multas Ambientales",
+    "12011-Cesiones Urbanisticas",
+    "13001-Estampilla Pro Bienestar del anciano",
+    "13004-Estampilla Pro Cultura",
+    "13005-Estampilla justicia familiar",
+    "13006-Tasa prodeporte",
+    "14001-SGP  Educacion Calidad",
+    "14002-SGP  Educacion Gratuidad",
+    "14101-SGP Alimentacion Escolar",
+    "14201-SGP  Agua potable y saneamiento basico",
+    "14301-SGP Proposito General Deportes",
+    "14401-SGP  Proposito General Cultura",
+    "14501-SGP  Proposito General Libre Inversion",
+    "14701-SGP - Primera Infancia",
+    "15001-Sistema General de Regalias",
+    "21007-Sobretasa Bomberil",
+    "21201-Fondo de solidaridad y redistribución de ingresos",
+    "21401-Contribución sobre contratos de obras pública",
+    "23001-ADRES Aseguramiento",
+    "23003-Recursos de Inspeccion, Vigilancia y Control 0,4%",
+    "23004-Coljuegos 75%",
+    "23005-SGP Salud  Regimén Subsidiado Cont. SSF",
+    "23006-Departamento Régimen Subsidiado SSF",
+    "23101-SGP Salud Pública",
+    "23202-SGP Salud  Oferta prestación de servicios",
+    "23301-Coljuegos 25%",
+    "23302-Departamento - otros gastos en salud inversion",
+    "31001-Programa PAE",
+    "31401-Aportes Departamentales",
+    "31402-Otras Entidades- Corantioquia",
+    "31403-Otras Entidades - Convenios",
+    "31405-Otras Entidades - Area Metropolitana",
+    "41001-Aportes Nacionales",
+    "51001-Recursos del credito",
+    "61001-Transferencias del Sector Electrico",
+    "61002-Ley del tabaco",
+    "71401-Retiro para pago de mesadas pensionales",
+    "71502-Retiros FONPET"
+  ];
 
   // ---------- Utilidades ----------
   function uid(){ return "it_" + Math.random().toString(36).slice(2,9); }
@@ -1555,12 +1605,14 @@
     total: document.getElementById("f_total"),
     justTecnica: document.getElementById("f_just_tecnica"),
     justJuridica: document.getElementById("f_just_juridica"),
-    articulo: document.getElementById("f_articulo")
+    articulo: document.getElementById("f_articulo"),
+    fuente: document.getElementById("f_fuente")
   };
 
   fillSelect(f.servicio, SERVICIOS);
   fillSelect(f.bpin, BPIN_OPTIONS);
   fillSelect(f.indicador, INDICADOR_OPTIONS);
+  fillSelect(f.fuente, FUENTES_OPTIONS);
 
   function labelFromOptions(opts, code){
     var f2 = opts.find(function(o){ return o.v === code; });
@@ -1709,17 +1761,15 @@
       var line = document.createElement("div");
       line.className = "fuente-row";
       line.innerHTML =
-        '<input type="text" placeholder="Nombre de la fuente (ej: SGP, ICLD, Recursos propios)" value="' + escapeHtml(row.nombre) + '" data-idx="' + idx + '" data-field="nombre">' +
+        '<span style="font-size:.85rem;line-height:1.3;">' + escapeHtml(row.nombre) + '</span>' +
         '<input type="text" inputmode="numeric" placeholder="Valor" value="' + (row.valor ? Number(row.valor).toLocaleString("es-CO") : "") + '" data-idx="' + idx + '" data-field="valor">' +
         '<button type="button" class="btn btn-danger-text btn-sm" data-remove="' + idx + '">×</button>';
       fuentesListEl.appendChild(line);
     });
-    fuentesListEl.querySelectorAll("input").forEach(function(inp){
+    fuentesListEl.querySelectorAll("input[data-field='valor']").forEach(function(inp){
       inp.addEventListener("input", function(){
         var idx = Number(inp.getAttribute("data-idx"));
-        var field = inp.getAttribute("data-field");
-        if (field === "valor"){ fuentesDraft[idx].valor = onlyDigits(inp.value); }
-        else { fuentesDraft[idx].nombre = inp.value; }
+        fuentesDraft[idx].valor = onlyDigits(inp.value);
         renderFuentesTotal();
       });
     });
@@ -1730,9 +1780,13 @@
       });
     });
   }
-  document.getElementById("btnAddFuente").addEventListener("click", function(){
-    fuentesDraft.push({ id: uid(), nombre:"", valor:"" });
-    renderFuentes();
+  f.fuente.addEventListener("change", function(){
+    var val = f.fuente.value;
+    if (val && !fuentesDraft.some(function(r){ return r.nombre === val; })){
+      fuentesDraft.push({ id: uid(), nombre: val, valor: "" });
+      renderFuentes();
+    }
+    f.fuente.value = "";
   });
 
   function renderFuentesTotal(){
@@ -1776,6 +1830,7 @@
     f.objeto.value = item ? item.objeto || "" : "";
     f.bpin.value = "";
     f.indicador.value = "";
+    f.fuente.value = "";
     bpinDraft = item && item.bpin ? item.bpin.slice() : [];
     indicadorDraft = item && item.indicador ? item.indicador.map(function(x){ return { codigo: x.codigo, porcentaje: (x.porcentaje === null || x.porcentaje === undefined) ? "" : x.porcentaje }; }) : [];
     renderBpinChosen();
