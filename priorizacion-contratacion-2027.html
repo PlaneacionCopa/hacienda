@@ -462,9 +462,9 @@
 
         <div class="grid2" id="honorariosRow" style="margin-top:.9rem;">
           <div class="field">
-            <label for="f_honorarios">Honorarios mensuales</label>
-            <input id="f_honorarios" inputmode="numeric" placeholder="Ej: 3.200.000">
-            <div class="hint" id="honorariosHint">Valor libre acordado para el contratista (no aplica escala salarial de funcionarios).</div>
+            <label for="f_honorarios">Honorarios</label>
+            <input id="f_honorarios" inputmode="numeric" placeholder="Ej: 3.000.000">
+            <div class="hint" id="honorariosHint">Valor total pactado con el contratista para todo el contrato (no aplica escala salarial de funcionarios).</div>
           </div>
           <div class="field">
             <label for="f_total" class="req">Total proyección del contrato</label>
@@ -1531,10 +1531,9 @@
 
     if (esPrestacion){
       var hon = Number(onlyDigits(f.honorarios.value)) || 0;
-      var total = dias ? Math.round(hon * (dias/30)) : 0;
-      f.total.value = total ? total.toLocaleString("es-CO") : "";
+      f.total.value = hon ? hon.toLocaleString("es-CO") : "";
       f.total.disabled = true;
-      document.getElementById("totalHint").textContent = "Cálculo automático: honorarios mensuales × (días ÷ 30).";
+      document.getElementById("totalHint").textContent = "El total corresponde directamente al valor de los honorarios pactados.";
     } else {
       f.total.disabled = false;
       document.getElementById("totalHint").textContent = "Ingrese el valor total proyectado del contrato.";
