@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --navy-900:#152a5c;
@@ -241,7 +242,7 @@
   <div class="card login-card">
     <div class="login-head">
       <div class="badge-shield">🏛️</div>
-      <h1>Contratación 2027</h1>
+      <h1>Priorización de Contratación 2027</h1>
       <p>CM</p>
     </div>
     <form class="login-form" id="loginForm">
@@ -279,7 +280,10 @@
   <div class="card" id="adminOverviewCard" style="display:none;margin-bottom:1.25rem;">
     <div class="toolbar">
       <h2>Panel de administración — todas las secretarías</h2>
-      <span class="disabled-note" id="adminOverviewTotalBox"></span>
+      <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;">
+        <span class="disabled-note" id="adminOverviewTotalBox"></span>
+        <button class="btn btn-ghost btn-sm" id="btnExportarExcel">⬇ Exportar a Excel</button>
+      </div>
     </div>
     <div id="adminOverviewTable" style="padding:0 1.4rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;"></div>
   </div>
@@ -508,7 +512,7 @@
           <label for="f_fuente">Agregar fuente</label>
           <select id="f_fuente"></select>
         </div>
-        <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.45rem;"></div>
+        <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
       </div>
 
       <div>
@@ -1279,7 +1283,7 @@
       var fuentesRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", itemIds);
       (fuentesRes.data || []).forEach(function(f2){
         if (!fuentesByItem[f2.item_id]) fuentesByItem[f2.item_id] = [];
-        fuentesByItem[f2.item_id].push({ id: f2.id, nombre: f2.nombre });
+        fuentesByItem[f2.item_id].push({ id: f2.id, nombre: f2.nombre, valor: f2.valor });
       });
     }
 
@@ -1584,6 +1588,94 @@
       .subscribe();
   }
 
+  // ---------- Exportar todo a Excel (solo admin) ----------
+  async function exportarExcel(){
+    var btn = document.getElementById("btnExportarExcel");
+    if (typeof XLSX === "undefined"){
+      alert("No se pudo cargar la librería para generar el Excel. Verifica tu conexión o desactiva bloqueadores para este sitio e intenta de nuevo.");
+      return;
+    }
+    btn.disabled = true; btn.textContent = "Generando...";
+    try{
+      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").order("secretaria_id", { ascending: true });
+      if (itemsRes.error) throw itemsRes.error;
+      var items = itemsRes.data || [];
+
+      var itemIds = items.map(function(i){ return i.id; });
+      var fuentesByItem = {};
+      if (itemIds.length){
+        var fRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", itemIds);
+        (fRes.data || []).forEach(function(row){
+          if (!fuentesByItem[row.item_id]) fuentesByItem[row.item_id] = [];
+          fuentesByItem[row.item_id].push(row.nombre);
+        });
+      }
+
+      var listasRes = await sb.from("priorizacion_listas").select("secretaria_id, status, enviado_at");
+      var listaBySec = {};
+      (listasRes.data || []).forEach(function(l){ listaBySec[l.secretaria_id] = l; });
+
+      var headers = [
+        "Secretaría","Estado de la lista","Identificación tercero","Nombre tercero","Actividad",
+        "Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
+        "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
+        "Honorarios mensuales","Total proyectado","¿Vigencia futura?","Fuentes de financiación",
+        "Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
+      ];
+
+      var rows = items.map(function(i){
+        var lista = listaBySec[i.secretaria_id];
+        var estado = lista && lista.status === "enviado" ? "Enviado" : "Borrador";
+        var bpinTxt = Array.isArray(i.bpin) ? i.bpin.join(" | ") : "";
+        var indicadorTxt = Array.isArray(i.indicador) ? i.indicador.map(function(x){
+          return x.codigo + (x.porcentaje !== null && x.porcentaje !== undefined ? " (" + x.porcentaje + "%)" : "");
+        }).join(" | ") : "";
+        var fuentesTxt = (fuentesByItem[i.id] || []).join(" | ");
+        var dias = calcDiasInclusive(i.fecha_inicio, i.fecha_fin);
+        return [
+          i.secretarias ? i.secretarias.nombre : i.secretaria_id,
+          estado,
+          i.identificacion_tercero || "",
+          i.nombre_tercero || "",
+          i.actividad || "",
+          i.objeto || "",
+          i.servicio_contratar || "",
+          bpinTxt,
+          indicadorTxt,
+          tipoLabel(i.tipo_contrato) || i.tipo_contrato || "",
+          i.modalidad_seleccion || "",
+          i.forma_pago || "",
+          i.fecha_inicio || "",
+          i.fecha_fin || "",
+          dias,
+          Number(i.honorarios) || 0,
+          Number(i.total) || 0,
+          i.vigencia_futura === "si" ? "Sí" : "No",
+          fuentesTxt,
+          i.justificacion_tecnica || "",
+          i.justificacion_juridica || "",
+          i.articulo_ley || "",
+          i.created_at ? new Date(i.created_at).toLocaleString("es-CO") : ""
+        ];
+      });
+
+      var wsData = [headers].concat(rows);
+      var ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws["!cols"] = headers.map(function(){ return { wch: 24 }; });
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Priorizacion 2027");
+
+      var fecha = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, "priorizacion_contratacion_2027_" + fecha + ".xlsx");
+    }catch(err){
+      console.error(err);
+      alert("No se pudo generar el Excel: " + (err.message || err));
+    }finally{
+      btn.disabled = false; btn.textContent = "⬇ Exportar a Excel";
+    }
+  }
+  document.getElementById("btnExportarExcel").addEventListener("click", exportarExcel);
+
   // ---------- Modal: agregar / editar ----------
   var f = {
     identificacion: document.getElementById("f_identificacion"),
@@ -1750,35 +1842,11 @@
     f.total.addEventListener(evt, function(){ updateIndicadorTotalsOnly(); });
   });
 
-  // Fuentes de financiación
-  var fuentesListEl = document.getElementById("fuentesList");
-
-  function renderFuentes(){
-    fuentesListEl.innerHTML = "";
-
-    fuentesDraft.forEach(function(row, idx){
-      var line = document.createElement("div");
-      line.className = "fuente-row";
-      line.innerHTML =
-        '<span style="font-size:.85rem;line-height:1.3;">' + escapeHtml(row.nombre) + '</span>' +
-        '<button type="button" class="btn btn-danger-text btn-sm" data-remove="' + idx + '">×</button>';
-      fuentesListEl.appendChild(line);
-    });
-
-    fuentesListEl.querySelectorAll("[data-remove]").forEach(function(btn){
-      btn.addEventListener("click", function(){
-        fuentesDraft.splice(Number(btn.getAttribute("data-remove")), 1);
-        renderFuentes();
-      });
-    });
-  }
-
+  // Fuentes de financiación (solo selección, sin valor)
+  function renderFuentesChosen(){ renderChosenList("fuentesList", fuentesDraft, FUENTES_OPTIONS); }
   f.fuente.addEventListener("change", function(){
     var val = f.fuente.value;
-    if (val && !fuentesDraft.some(function(r){ return r.nombre === val; })){
-      fuentesDraft.push({ id: uid(), nombre: val });
-      renderFuentes();
-    }
+    if (val && fuentesDraft.indexOf(val) === -1){ fuentesDraft.push(val); renderFuentesChosen(); }
     f.fuente.value = "";
   });
 
@@ -1820,13 +1888,13 @@
     f.articulo.value = item ? item.articuloLey || "" : "";
     document.querySelector('input[name="f_vigencia"][value="' + (item ? (item.vigenciaFutura||"no") : "no") + '"]').checked = true;
 
-    fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return { id:x.id || uid(), nombre:x.nombre }; }) : [];
+    fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return x.nombre; }) : [];
 
     var allInputs = document.querySelectorAll("#modalBody input, #modalBody select, #modalBody textarea");
     allInputs.forEach(function(el){ el.disabled = locked; });
     document.getElementById("btnSaveItem").style.display = locked ? "none" : "inline-flex";
 
-    renderFuentes();
+    renderFuentesChosen();
     updateDiasYTotal();
 
     els.overlay.classList.add("open");
@@ -1861,10 +1929,9 @@
     if (totalVal === 0){
       valid = false;
       alert("Ingrese el total proyectado del contrato" + (f.tipo.value !== "1-prestaciondeservicios" ? " (obligatorio cuando el tipo de contrato no es prestación de servicios)." : "."));
-    }
-    if (fuentesDraft.length === 0){
+    } else if (fuentesDraft.length === 0){
       valid = false;
-      alert("Agregue al menos una fuente de financiación.");
+      alert("Seleccione al menos una fuente de financiación.");
     }
     if (!valid) return;
 
@@ -1890,7 +1957,7 @@
       justificacion_juridica: f.justJuridica.value.trim(),
       articulo_ley: f.articulo.value.trim()
     };
-    var payloadFuentes = fuentesDraft.map(function(r){ return { nombre: r.nombre.trim(), valor: 0 }; });
+    var payloadFuentes = fuentesDraft.map(function(r){ return { nombre: r.nombre.trim(), valor: Number(r.valor)||0 }; });
 
     var saveBtn = document.getElementById("btnSaveItem");
     saveBtn.disabled = true; saveBtn.textContent = "Guardando...";
