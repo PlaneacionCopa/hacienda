@@ -221,6 +221,9 @@
   .vf-row .vf-valor{font-weight:700;text-align:right;}
   .vf-block{border:1px dashed var(--line);border-radius:10px;padding:.7rem;margin-top:.6rem;}
   .vf-block h4{margin:0 0 .5rem;font-size:.8rem;color:var(--navy-800);}
+  .vf-summary{margin-top:.6rem;padding:.55rem .7rem;border-radius:10px;font-size:.82rem;font-weight:600;display:none;}
+  .vf-summary.ok{display:block;background:#e6f6ec;color:#166534;border:1px solid #86d3a3;}
+  .vf-summary.bad{display:block;background:#fdecec;color:#a3231f;border:1px solid #f3b6b4;}
 
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
@@ -624,6 +627,7 @@
             </div>
             <div id="vf2027List" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
           </div>
+          <div class="vf-summary" id="vfSummary"></div>
           <div class="error-text" id="err_vigencia"></div>
         </div>
       </div>
@@ -1379,10 +1383,11 @@
   // ---------- Vista de captura: setup según rol ----------
   function setupCaptureControls(){
     // La pseudo-secretaría "O" (necesidades ocultas) solo la puede ver y elegir el admin
-    fillSelect(els.secretariaSelect, secretariasCatalog.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
+    var catalogoVisible = profile.role === "admin" ? secretariasCatalog : secretariasCatalog.filter(function(s){ return s.id !== "oculto"; });
+    fillSelect(els.secretariaSelect, catalogoVisible.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
     if (profile.role === "admin"){
       els.secretariaSelect.disabled = false;
-      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría.";
+      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas.";
     } else {
       els.secretariaSelect.disabled = true;
       els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
@@ -1469,14 +1474,15 @@
   }
 
   function renderTopControls(){
+    var esOcultos = currentSecretariaId === "oculto";
     var enviado = state.status === "enviado";
     els.statusPill.className = "status-pill " + (enviado ? "status-enviado" : "status-borrador");
     els.statusPill.textContent = enviado ? "✔ Enviado" : "● Borrador";
-    els.enviadoBanner.style.display = enviado ? "flex" : "none";
-    els.btnReabrir.style.display = (enviado && profile.role === "admin") ? "inline-flex" : "none";
-    els.itemsToolbarTitle.textContent = "Necesidades priorizadas";
-    els.btnAdd.style.display = "inline-flex";
-    els.btnEnviar.style.display = "inline-flex";
+    els.enviadoBanner.style.display = (enviado && !esOcultos) ? "flex" : "none";
+    els.btnReabrir.style.display = (enviado && profile.role === "admin" && !esOcultos) ? "inline-flex" : "none";
+    els.itemsToolbarTitle.textContent = esOcultos ? "Necesidades ocultas" : "Necesidades priorizadas";
+    els.btnAdd.style.display = esOcultos ? "none" : "inline-flex";
+    els.btnEnviar.style.display = esOcultos ? "none" : "inline-flex";
     els.btnAdd.disabled = isLocked();
     els.btnEnviar.disabled = enviado || state.items.length === 0;
   }
@@ -1545,15 +1551,15 @@
         actions.appendChild(delBtn);
       }
       if (profile.role === "admin"){
-        var yaOculto = !!item.oculto;
+        var enOcultos = currentSecretariaId === "oculto";
         var hideBtn = document.createElement("button");
         hideBtn.className = "btn btn-danger-text btn-sm";
-        hideBtn.textContent = yaOculto ? "Reactivar" : "Ocultar";
+        hideBtn.textContent = enOcultos ? "Reactivar" : "Ocultar";
         hideBtn.onclick = async function(){
-          var msg = yaOculto ? "¿Reactivar esta necesidad? Volverá a contar en los totales." : "¿Ocultar esta necesidad? No contará en los totales del admin ni del alcalde hasta que la reactive. La secretaría la seguirá viendo en su lista.";
+          var msg = enOcultos ? "¿Reactivar esta necesidad y devolverla a su secretaría de origen?" : "¿Ocultar esta necesidad? Dejará de verla la secretaría y no contará en los totales hasta que la reactive desde \"O\".";
           if (!confirm(msg)) return;
-          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !yaOculto });
-          if (res.error){ alert("No se pudo " + (yaOculto ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
+          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !enOcultos });
+          if (res.error){ alert("No se pudo " + (enOcultos ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
           await loadSecretariaData();
         };
         actions.appendChild(hideBtn);
@@ -2065,6 +2071,7 @@
         renderVfList(anio);
       });
     });
+    renderVfSummary();
   }
   document.getElementById("btnAddVf2026").addEventListener("click", function(){
     var fuente = f.vf2026Fuente.value;
@@ -2083,21 +2090,49 @@
     renderVfList(2027);
   });
 
+  // Muestra en vivo si la suma de las fuentes de vigencia futura ya iguala el Total proyección del contrato
+  function renderVfSummary(){
+    var el = document.getElementById("vfSummary");
+    var esSi = document.querySelector('input[name="f_vigencia"]:checked').value === "si";
+    if (!esSi){ el.className = "vf-summary"; el.textContent = ""; return; }
+    var tipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
+    var tipo = tipoEl ? tipoEl.value : "";
+    if (!tipo){ el.className = "vf-summary"; el.textContent = ""; return; }
+    var totalContrato = Number(onlyDigits(f.total.value)) || 0;
+    var suma2026 = vigenciaDraft[2026].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var suma2027 = vigenciaDraft[2027].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var sumaTotal = tipo === "ordinaria" ? (suma2026 + suma2027) : suma2027;
+    var etiquetaSuma = tipo === "ordinaria" ? "Suma vigencia futura (2026 + 2027)" : "Suma vigencia futura (2027)";
+    var ok = sumaTotal === totalContrato && totalContrato > 0;
+    el.className = "vf-summary " + (ok ? "ok" : "bad");
+    if (ok){
+      el.textContent = "✓ " + etiquetaSuma + ": " + fmtCOP(sumaTotal) + " — coincide con el Total proyección del contrato.";
+    } else {
+      var diff = totalContrato - sumaTotal;
+      var diffTxt = diff > 0 ? ("Falta " + fmtCOP(diff)) : ("Sobran " + fmtCOP(Math.abs(diff)));
+      el.textContent = etiquetaSuma + ": " + fmtCOP(sumaTotal) + " de " + fmtCOP(totalContrato) + " (Total proyección del contrato). " + diffTxt + ".";
+    }
+  }
+
   function updateVigenciaVisibility(){
     var esSi = document.querySelector('input[name="f_vigencia"]:checked').value === "si";
     document.getElementById("vfTipoWrap").style.display = esSi ? "block" : "none";
     if (!esSi){
       document.getElementById("vf2026Block").style.display = "none";
       document.getElementById("vf2027Block").style.display = "none";
+      renderVfSummary();
       return;
     }
     var tipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
     var tipo = tipoEl ? tipoEl.value : "";
     document.getElementById("vf2026Block").style.display = tipo === "ordinaria" ? "block" : "none";
     document.getElementById("vf2027Block").style.display = (tipo === "ordinaria" || tipo === "excepcional") ? "block" : "none";
+    renderVfSummary();
   }
   document.querySelectorAll('input[name="f_vigencia"]').forEach(function(r){ r.addEventListener("change", updateVigenciaVisibility); });
   document.querySelectorAll('input[name="f_vigencia_tipo"]').forEach(function(r){ r.addEventListener("change", updateVigenciaVisibility); });
+  f.total.addEventListener("input", renderVfSummary);
+  f.total.addEventListener("blur", renderVfSummary);
 
   // ---------- Foto del contratista ----------
   f.foto.addEventListener("change", function(){
@@ -2272,15 +2307,31 @@
           document.getElementById("err_vigencia").textContent = "La vigencia futura ordinaria requiere al menos una fuente y valor para 2026 y para 2027.";
           valid = false;
         } else {
-          vigenciaDraft[2026].forEach(function(r){ payloadVigencia.push({ anio: 2026, fuente: r.fuente, valor: r.valor }); });
-          vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+          var sumaVf2026 = vigenciaDraft[2026].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+          var sumaVf2027Ord = vigenciaDraft[2027].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+          var sumaVfOrd = sumaVf2026 + sumaVf2027Ord;
+          var totalParaVf = Number(onlyDigits(f.total.value)) || 0;
+          if (sumaVfOrd !== totalParaVf){
+            document.getElementById("err_vigencia").textContent = "La suma de las fuentes de vigencia futura 2026 + 2027 (" + fmtCOP(sumaVfOrd) + ") debe ser igual al Total proyección del contrato (" + fmtCOP(totalParaVf) + ").";
+            valid = false;
+          } else {
+            vigenciaDraft[2026].forEach(function(r){ payloadVigencia.push({ anio: 2026, fuente: r.fuente, valor: r.valor }); });
+            vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+          }
         }
       } else if (vfTipoVal === "excepcional"){
         if (vigenciaDraft[2027].length === 0){
           document.getElementById("err_vigencia").textContent = "La vigencia futura excepcional requiere al menos una fuente y valor para 2027.";
           valid = false;
         } else {
-          vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+          var sumaVf2027Exc = vigenciaDraft[2027].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+          var totalParaVfExc = Number(onlyDigits(f.total.value)) || 0;
+          if (sumaVf2027Exc !== totalParaVfExc){
+            document.getElementById("err_vigencia").textContent = "La suma de las fuentes de vigencia futura 2027 (" + fmtCOP(sumaVf2027Exc) + ") debe ser igual al Total proyección del contrato (" + fmtCOP(totalParaVfExc) + ").";
+            valid = false;
+          } else {
+            vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+          }
         }
       }
     }
