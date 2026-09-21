@@ -1957,7 +1957,7 @@
       justificacion_juridica: f.justJuridica.value.trim(),
       articulo_ley: f.articulo.value.trim()
     };
-    var payloadFuentes = fuentesDraft.map(function(r){ return { nombre: r.nombre.trim(), valor: Number(r.valor)||0 }; });
+    var payloadFuentes = fuentesDraft.map(function(nombre){ return { nombre: String(nombre).trim(), valor: 0 }; });
 
     var saveBtn = document.getElementById("btnSaveItem");
     saveBtn.disabled = true; saveBtn.textContent = "Guardando...";
