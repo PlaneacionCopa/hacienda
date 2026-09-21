@@ -212,6 +212,39 @@
   .indicador-row input{padding:.35rem .5rem;font-size:.8rem;}
   .indicador-row .ind-total{font-weight:700;text-align:right;padding-right:.3rem;}
 
+  .vf-add-row{display:grid;grid-template-columns:1fr 160px auto;gap:.5rem;align-items:end;}
+  .vf-row{
+    display:grid;grid-template-columns:1fr 140px 34px;gap:.5rem;align-items:center;
+    font-size:.82rem;background:var(--navy-050);border:1px solid var(--line);
+    border-radius:8px;padding:.4rem .6rem;
+  }
+  .vf-row .vf-valor{font-weight:700;text-align:right;}
+  .vf-block{border:1px dashed var(--line);border-radius:10px;padding:.7rem;margin-top:.6rem;}
+  .vf-block h4{margin:0 0 .5rem;font-size:.8rem;color:var(--navy-800);}
+
+  .foto-row{display:flex;align-items:center;gap:.8rem;}
+  .foto-preview{
+    width:64px;height:64px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
+    background:var(--navy-050);flex-shrink:0;
+  }
+  .foto-thumb{
+    width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--line);
+    vertical-align:middle;margin-right:.4rem;
+  }
+
+  .tipo-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;padding:1.2rem 1.4rem;}
+  @media (max-width:520px){ .tipo-choice-grid{grid-template-columns:1fr;} }
+  .tipo-choice-card{
+    border:1px solid var(--line);border-radius:12px;padding:1.1rem;cursor:pointer;
+    background:var(--paper);text-align:left;font:inherit;
+  }
+  .tipo-choice-card:hover{border-color:var(--navy-800);background:var(--navy-050);}
+  .tipo-choice-card .glyph{font-size:1.4rem;}
+  .tipo-choice-card h4{margin:.4rem 0 .2rem;font-size:.92rem;color:var(--navy-900);}
+  .tipo-choice-card p{margin:0;font-size:.78rem;color:var(--ink-soft);}
+
+  .tag-oculto{background:var(--red-bg);color:var(--red);}
+
   .login-wrap{
     min-height:80vh;display:flex;align-items:center;justify-content:center;
   }
@@ -329,6 +362,7 @@
       <h2>Necesidades priorizadas</h2>
       <div style="display:flex;gap:.6rem;">
         <button class="btn btn-ghost" id="btnAdd">＋ Agregar necesidad</button>
+        <button class="btn btn-ghost" id="btnVerOcultos" style="display:none;">🙈 Ocultos (<span id="ocultosCount">0</span>)</button>
         <button class="btn btn-success" id="btnEnviar">Enviar lista definitiva</button>
       </div>
     </div>
@@ -339,6 +373,11 @@
     </div>
 
     <div id="itemsList" class="items"></div>
+
+    <div id="ocultosPanel" style="display:none;border-top:1px solid var(--line);">
+      <div class="toolbar"><h2>Necesidades ocultas de esta secretaría</h2></div>
+      <div id="ocultosList" class="items"></div>
+    </div>
   </div>
 
   <!-- Vista del alcalde (solo lectura, con gráficas) -->
@@ -390,6 +429,28 @@
   </div>
 </div>
 
+<!-- Modal: elegir tipo de necesidad -->
+<div class="overlay" id="overlayTipo">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-head">
+      <h3>¿Qué tipo de necesidad va a agregar?</h3>
+      <button class="modal-close" id="btnCloseTipoModal">×</button>
+    </div>
+    <div class="tipo-choice-grid">
+      <button type="button" class="tipo-choice-card" id="btnTipoInversion">
+        <div class="glyph">🏗️</div>
+        <h4>Inversión</h4>
+        <p>Asociada al Plan de Desarrollo: requiere BPIN e indicador.</p>
+      </button>
+      <button type="button" class="tipo-choice-card" id="btnTipoFuncionamiento">
+        <div class="glyph">🗂️</div>
+        <h4>Funcionamiento</h4>
+        <p>No requiere BPIN ni indicador.</p>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal agregar/editar -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -410,6 +471,15 @@
             <label for="f_nombre">Nombre del tercero</label>
             <input id="f_nombre" placeholder="Nombre completo">
           </div>
+        </div>
+        <div class="field" style="margin-top:.9rem;">
+          <label for="f_foto" id="lblFoto">Foto del contratista</label>
+          <div class="foto-row">
+            <img id="fotoPreview" class="foto-preview" style="display:none;" alt="Foto del contratista">
+            <input type="file" id="f_foto" accept="image/*" style="max-width:260px;">
+          </div>
+          <div class="hint">Obligatoria si diligencia identificación o nombre del tercero.</div>
+          <div class="error-text" id="err_foto"></div>
         </div>
       </div>
 
@@ -432,7 +502,7 @@
         </div>
       </div>
 
-      <div>
+      <div id="planDesarrolloSection">
         <div class="section-label">Plan de Desarrollo</div>
         <div class="grid2" style="margin-top:.6rem;">
           <div class="field">
@@ -503,6 +573,37 @@
             <label><input type="radio" name="f_vigencia" value="no" checked> No</label>
             <label><input type="radio" name="f_vigencia" value="si"> Sí</label>
           </div>
+        </div>
+
+        <div id="vfTipoWrap" style="display:none;margin-top:.7rem;">
+          <div class="field">
+            <label>¿Ordinaria o excepcional?</label>
+            <div class="radio-group">
+              <label><input type="radio" name="f_vigencia_tipo" value="ordinaria"> Ordinaria (2026 y 2027)</label>
+              <label><input type="radio" name="f_vigencia_tipo" value="excepcional"> Excepcional (solo 2027)</label>
+            </div>
+          </div>
+
+          <div id="vf2026Block" class="vf-block" style="display:none;">
+            <h4>Vigencia futura 2026 — pasa recursos de este año al próximo</h4>
+            <div class="vf-add-row">
+              <div class="field"><label for="f_vf2026_fuente">Fuente</label><select id="f_vf2026_fuente"></select></div>
+              <div class="field"><label for="f_vf2026_valor">Valor</label><input id="f_vf2026_valor" inputmode="numeric" placeholder="0"></div>
+              <button type="button" class="btn btn-ghost btn-sm" id="btnAddVf2026">Agregar</button>
+            </div>
+            <div id="vf2026List" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
+          </div>
+
+          <div id="vf2027Block" class="vf-block" style="display:none;">
+            <h4>Vigencia futura 2027</h4>
+            <div class="vf-add-row">
+              <div class="field"><label for="f_vf2027_fuente">Fuente</label><select id="f_vf2027_fuente"></select></div>
+              <div class="field"><label for="f_vf2027_valor">Valor</label><input id="f_vf2027_valor" inputmode="numeric" placeholder="0"></div>
+              <button type="button" class="btn btn-ghost btn-sm" id="btnAddVf2027">Agregar</button>
+            </div>
+            <div id="vf2027List" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
+          </div>
+          <div class="error-text" id="err_vigencia"></div>
         </div>
       </div>
 
@@ -1122,6 +1223,10 @@
   var fuentesDraft = [];
   var bpinDraft = [];
   var indicadorDraft = [];
+  var vigenciaDraft = { 2026: [], 2027: [] };
+  var currentTipoNecesidad = "inversion";
+  var fotoFile = null;
+  var fotoUrlActual = null;
   var realtimeChannel = null;
   var realtimeChannelOverview = null;
 
@@ -1144,6 +1249,10 @@
     btnAdd: document.getElementById("btnAdd"),
     btnEnviar: document.getElementById("btnEnviar"),
     btnReabrir: document.getElementById("btnReabrir"),
+    btnVerOcultos: document.getElementById("btnVerOcultos"),
+    ocultosPanel: document.getElementById("ocultosPanel"),
+    ocultosList: document.getElementById("ocultosList"),
+    ocultosCount: document.getElementById("ocultosCount"),
     overlay: document.getElementById("overlay"),
     modalTitle: document.getElementById("modalTitle")
   };
@@ -1274,16 +1383,22 @@
     var listaRes = await sb.from("priorizacion_listas").select("status").eq("secretaria_id", currentSecretariaId).single();
     state.status = (listaRes.data && listaRes.data.status) || "borrador";
 
-    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).order("created_at", { ascending: true });
+    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).eq("oculto", false).order("created_at", { ascending: true });
     var rawItems = itemsRes.data || [];
     var itemIds = rawItems.map(function(i){ return i.id; });
 
     var fuentesByItem = {};
+    var vigenciaByItem = {};
     if (itemIds.length){
       var fuentesRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", itemIds);
       (fuentesRes.data || []).forEach(function(f2){
         if (!fuentesByItem[f2.item_id]) fuentesByItem[f2.item_id] = [];
         fuentesByItem[f2.item_id].push({ id: f2.id, nombre: f2.nombre, valor: f2.valor });
+      });
+      var vfRes = await sb.from("priorizacion_vigencia_futura").select("*").in("item_id", itemIds);
+      (vfRes.data || []).forEach(function(v){
+        if (!vigenciaByItem[v.item_id]) vigenciaByItem[v.item_id] = [];
+        vigenciaByItem[v.item_id].push({ anio: v.anio, fuente: v.fuente, valor: v.valor });
       });
     }
 
@@ -1297,6 +1412,7 @@
         objeto: i.objeto,
         bpin: i.bpin || [],
         indicador: i.indicador || [],
+        tipoNecesidad: i.tipo_necesidad || "inversion",
         tipoContrato: i.tipo_contrato,
         modalidadSeleccion: i.modalidad_seleccion,
         formaPago: i.forma_pago,
@@ -1305,6 +1421,9 @@
         honorarios: i.honorarios,
         total: Number(i.total) || 0,
         vigenciaFutura: i.vigencia_futura,
+        vigenciaFuturaTipo: i.vigencia_futura_tipo,
+        vigenciaFuturaRows: vigenciaByItem[i.id] || [],
+        fotoUrl: i.foto_url || null,
         justTecnica: i.justificacion_tecnica,
         justJuridica: i.justificacion_juridica,
         articuloLey: i.articulo_ley,
@@ -1314,7 +1433,41 @@
 
     renderAll();
     subscribeRealtimeCaptura();
+    if (profile.role === "admin"){
+      els.btnVerOcultos.style.display = "inline-flex";
+      await loadOcultos();
+    }
   }
+
+  // ---------- Ocultos de la secretaría actual (solo admin) ----------
+  async function loadOcultos(){
+    if (!currentSecretariaId) return;
+    var res = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).eq("oculto", true).order("oculto_at", { ascending: false });
+    var rows = res.data || [];
+    els.ocultosCount.textContent = rows.length;
+    els.ocultosList.innerHTML = rows.map(function(i){
+      return '<div class="item-card">' +
+        '<div class="item-top">' +
+        '<div><div class="item-objeto">' + escapeHtml(i.objeto || "(Sin objeto)") + '</div>' +
+        '<div class="item-tags"><span class="tag tag-oculto">Oculto</span>' +
+        '<span class="tag">' + escapeHtml(tipoLabel(i.tipo_contrato)) + '</span></div></div>' +
+        '<div style="display:flex;align-items:center;gap:.8rem;">' +
+        '<div class="total" style="font-weight:800;">' + fmtCOP(i.total) + '</div>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-reactivar="' + i.id + '">Reactivar</button>' +
+        '</div></div></div>';
+    }).join("") || "<p style='padding:0 1.4rem 1rem;color:var(--ink-soft);'>No hay necesidades ocultas.</p>";
+    els.ocultosList.querySelectorAll("[data-reactivar]").forEach(function(btn){
+      btn.addEventListener("click", async function(){
+        var res2 = await sb.rpc("ocultar_necesidad", { p_item_id: btn.getAttribute("data-reactivar"), p_oculto: false });
+        if (res2.error){ alert("No se pudo reactivar: " + res2.error.message); return; }
+        await loadSecretariaData();
+      });
+    });
+  }
+  els.btnVerOcultos.addEventListener("click", function(){
+    var showing = els.ocultosPanel.style.display !== "none";
+    els.ocultosPanel.style.display = showing ? "none" : "block";
+  });
 
   function subscribeRealtimeCaptura(){
     if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
@@ -1364,14 +1517,16 @@
 
       var left = document.createElement("div");
       left.innerHTML =
-        '<div class="item-objeto">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
+        (item.fotoUrl ? '<img src="' + escapeHtml(item.fotoUrl) + '" class="foto-thumb" alt="">' : '') +
+        '<div class="item-objeto" style="display:inline;">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
         '<div class="item-tags">' +
+          '<span class="tag">' + (item.tipoNecesidad === "funcionamiento" ? "Funcionamiento" : "Inversión") + '</span>' +
           '<span class="tag">' + escapeHtml(item.servicioContratar || "Servicio no definido") + '</span>' +
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
-          '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' +
-          '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' +
+          (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
+          (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' : '') +
         '</div>';
 
       var actions = document.createElement("div");
@@ -1392,6 +1547,18 @@
           await loadSecretariaData();
         };
         actions.appendChild(delBtn);
+      }
+      if (profile.role === "admin"){
+        var hideBtn = document.createElement("button");
+        hideBtn.className = "btn btn-danger-text btn-sm";
+        hideBtn.textContent = "Ocultar";
+        hideBtn.onclick = async function(){
+          if (!confirm("¿Ocultar esta necesidad? No contará en los totales hasta que la reactive.")) return;
+          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: true });
+          if (res.error){ alert("No se pudo ocultar: " + res.error.message); return; }
+          await loadSecretariaData();
+        };
+        actions.appendChild(hideBtn);
       }
 
       top.appendChild(left);
@@ -1696,13 +1863,20 @@
     justTecnica: document.getElementById("f_just_tecnica"),
     justJuridica: document.getElementById("f_just_juridica"),
     articulo: document.getElementById("f_articulo"),
-    fuente: document.getElementById("f_fuente")
+    fuente: document.getElementById("f_fuente"),
+    foto: document.getElementById("f_foto"),
+    vf2026Fuente: document.getElementById("f_vf2026_fuente"),
+    vf2026Valor: document.getElementById("f_vf2026_valor"),
+    vf2027Fuente: document.getElementById("f_vf2027_fuente"),
+    vf2027Valor: document.getElementById("f_vf2027_valor")
   };
 
   fillSelect(f.servicio, SERVICIOS);
   fillSelect(f.bpin, BPIN_OPTIONS);
   fillSelect(f.indicador, INDICADOR_OPTIONS);
   fillSelect(f.fuente, FUENTES_OPTIONS);
+  fillSelect(f.vf2026Fuente, FUENTES_OPTIONS);
+  fillSelect(f.vf2027Fuente, FUENTES_OPTIONS);
 
   function labelFromOptions(opts, code){
     var f2 = opts.find(function(o){ return o.v === code; });
@@ -1850,19 +2024,93 @@
     f.fuente.value = "";
   });
 
+  // ---------- Vigencia futura ordinaria / excepcional (fuente + valor por año) ----------
+  function renderVfList(anio){
+    var el = document.getElementById("vf" + anio + "List");
+    el.innerHTML = "";
+    vigenciaDraft[anio].forEach(function(row, idx){
+      var div = document.createElement("div");
+      div.className = "vf-row";
+      div.innerHTML =
+        '<span>' + escapeHtml(labelFromOptions(FUENTES_OPTIONS.map(function(o){return {v:o,l:o};}), row.fuente)) + '</span>' +
+        '<span class="vf-valor">' + fmtCOP(row.valor) + '</span>' +
+        '<button type="button" data-vf-remove="' + idx + '">×</button>';
+      el.appendChild(div);
+    });
+    el.querySelectorAll("[data-vf-remove]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        vigenciaDraft[anio].splice(Number(btn.getAttribute("data-vf-remove")), 1);
+        renderVfList(anio);
+      });
+    });
+  }
+  document.getElementById("btnAddVf2026").addEventListener("click", function(){
+    var fuente = f.vf2026Fuente.value;
+    var valor = Number(onlyDigits(f.vf2026Valor.value)) || 0;
+    if (!fuente || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0 para la vigencia futura 2026."); return; }
+    vigenciaDraft[2026].push({ fuente: fuente, valor: valor });
+    f.vf2026Fuente.value = ""; f.vf2026Valor.value = "";
+    renderVfList(2026);
+  });
+  document.getElementById("btnAddVf2027").addEventListener("click", function(){
+    var fuente = f.vf2027Fuente.value;
+    var valor = Number(onlyDigits(f.vf2027Valor.value)) || 0;
+    if (!fuente || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0 para la vigencia futura 2027."); return; }
+    vigenciaDraft[2027].push({ fuente: fuente, valor: valor });
+    f.vf2027Fuente.value = ""; f.vf2027Valor.value = "";
+    renderVfList(2027);
+  });
+
+  function updateVigenciaVisibility(){
+    var esSi = document.querySelector('input[name="f_vigencia"]:checked').value === "si";
+    document.getElementById("vfTipoWrap").style.display = esSi ? "block" : "none";
+    if (!esSi){
+      document.getElementById("vf2026Block").style.display = "none";
+      document.getElementById("vf2027Block").style.display = "none";
+      return;
+    }
+    var tipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
+    var tipo = tipoEl ? tipoEl.value : "";
+    document.getElementById("vf2026Block").style.display = tipo === "ordinaria" ? "block" : "none";
+    document.getElementById("vf2027Block").style.display = (tipo === "ordinaria" || tipo === "excepcional") ? "block" : "none";
+  }
+  document.querySelectorAll('input[name="f_vigencia"]').forEach(function(r){ r.addEventListener("change", updateVigenciaVisibility); });
+  document.querySelectorAll('input[name="f_vigencia_tipo"]').forEach(function(r){ r.addEventListener("change", updateVigenciaVisibility); });
+
+  // ---------- Foto del contratista ----------
+  f.foto.addEventListener("change", function(){
+    var file = f.foto.files && f.foto.files[0];
+    if (!file) return;
+    fotoFile = file;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = document.getElementById("fotoPreview");
+      img.src = e.target.result;
+      img.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  });
+
   function clearErrors(){
-    ["objeto","bpin","indicador"].forEach(function(k){
+    ["objeto","bpin","indicador","foto","vigencia"].forEach(function(k){
       document.getElementById("err_"+k).textContent = "";
     });
   }
 
-  function openModal(itemId){
+  function openModal(itemId, tipoNecesidadNueva){
     editingId = itemId || null;
     clearErrors();
     var locked = isLocked();
-    els.modalTitle.textContent = editingId ? (locked ? "Ver necesidad" : "Editar necesidad") : "Agregar necesidad de contratación";
-
     var item = editingId ? state.items.find(function(i){ return i.id === editingId; }) : null;
+
+    currentTipoNecesidad = item ? (item.tipoNecesidad || "inversion") : (tipoNecesidadNueva || "inversion");
+    var esFuncionamiento = currentTipoNecesidad === "funcionamiento";
+    document.getElementById("planDesarrolloSection").style.display = esFuncionamiento ? "none" : "block";
+
+    var tipoLabelTxt = esFuncionamiento ? "Funcionamiento" : "Inversión";
+    els.modalTitle.textContent = editingId
+      ? ((locked ? "Ver necesidad" : "Editar necesidad") + " — " + tipoLabelTxt)
+      : ("Agregar necesidad de contratación — " + tipoLabelTxt);
 
     f.identificacion.value = item ? item.identificacionTercero || "" : "";
     f.nombre.value = item ? item.nombreTercero || "" : "";
@@ -1887,8 +2135,28 @@
     f.justJuridica.value = item ? item.justJuridica || "" : "";
     f.articulo.value = item ? item.articuloLey || "" : "";
     document.querySelector('input[name="f_vigencia"][value="' + (item ? (item.vigenciaFutura||"no") : "no") + '"]').checked = true;
+    var vfTipoVal = item ? (item.vigenciaFuturaTipo || "") : "";
+    document.querySelectorAll('input[name="f_vigencia_tipo"]').forEach(function(r){ r.checked = (r.value === vfTipoVal); });
+    vigenciaDraft = { 2026: [], 2027: [] };
+    if (item && item.vigenciaFuturaRows){
+      item.vigenciaFuturaRows.forEach(function(row){
+        if (vigenciaDraft[row.anio]) vigenciaDraft[row.anio].push({ fuente: row.fuente, valor: Number(row.valor) || 0 });
+      });
+    }
+    f.vf2026Fuente.value = ""; f.vf2026Valor.value = "";
+    f.vf2027Fuente.value = ""; f.vf2027Valor.value = "";
+    renderVfList(2026);
+    renderVfList(2027);
+    updateVigenciaVisibility();
 
     fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return x.nombre; }) : [];
+
+    fotoFile = null;
+    fotoUrlActual = item ? (item.fotoUrl || null) : null;
+    f.foto.value = "";
+    var fotoImg = document.getElementById("fotoPreview");
+    if (fotoUrlActual){ fotoImg.src = fotoUrlActual; fotoImg.style.display = "block"; }
+    else { fotoImg.style.display = "none"; fotoImg.src = ""; }
 
     var allInputs = document.querySelectorAll("#modalBody input, #modalBody select, #modalBody textarea");
     allInputs.forEach(function(el){ el.disabled = locked; });
@@ -1903,22 +2171,33 @@
 
   document.getElementById("btnCloseModal").addEventListener("click", closeModal);
   document.getElementById("btnCancelModal").addEventListener("click", closeModal);
+
+  // ---------- Elegir tipo de necesidad antes de abrir el modal ----------
+  var overlayTipo = document.getElementById("overlayTipo");
+  function closeTipoModal(){ overlayTipo.classList.remove("open"); }
+  document.getElementById("btnCloseTipoModal").addEventListener("click", closeTipoModal);
+  overlayTipo.addEventListener("click", function(e){ if (e.target === overlayTipo) closeTipoModal(); });
+  document.getElementById("btnTipoInversion").addEventListener("click", function(){ closeTipoModal(); openModal(null, "inversion"); });
+  document.getElementById("btnTipoFuncionamiento").addEventListener("click", function(){ closeTipoModal(); openModal(null, "funcionamiento"); });
   els.overlay.addEventListener("click", function(e){ if (e.target === els.overlay) closeModal(); });
-  els.btnAdd.addEventListener("click", function(){ openModal(null); });
+  els.btnAdd.addEventListener("click", function(){ overlayTipo.classList.add("open"); });
 
   document.getElementById("btnSaveItem").addEventListener("click", async function(){
     clearErrors();
     var valid = true;
+    var esFuncionamiento = currentTipoNecesidad === "funcionamiento";
     if (!f.objeto.value.trim()){ document.getElementById("err_objeto").textContent = "El objeto es obligatorio."; valid = false; }
-    if (bpinDraft.length === 0){ document.getElementById("err_bpin").textContent = "Seleccione al menos un BPIN."; valid = false; }
-    if (indicadorDraft.length === 0){
-      document.getElementById("err_indicador").textContent = "Seleccione al menos un indicador.";
-      valid = false;
-    } else {
-      var sumaPctInd = Math.round(indicadorDraft.reduce(function(s,r){ return s + (Number(r.porcentaje)||0); }, 0) * 100) / 100;
-      if (sumaPctInd !== 100){
-        document.getElementById("err_indicador").textContent = "Los porcentajes de los indicadores deben sumar exactamente 100% (suma actual: " + sumaPctInd + "%).";
+    if (!esFuncionamiento){
+      if (bpinDraft.length === 0){ document.getElementById("err_bpin").textContent = "Seleccione al menos un BPIN."; valid = false; }
+      if (indicadorDraft.length === 0){
+        document.getElementById("err_indicador").textContent = "Seleccione al menos un indicador.";
         valid = false;
+      } else {
+        var sumaPctInd = Math.round(indicadorDraft.reduce(function(s,r){ return s + (Number(r.porcentaje)||0); }, 0) * 100) / 100;
+        if (sumaPctInd !== 100){
+          document.getElementById("err_indicador").textContent = "Los porcentajes de los indicadores deben sumar exactamente 100% (suma actual: " + sumaPctInd + "%).";
+          valid = false;
+        }
       }
     }
     if (!f.tipo.value || !f.modalidad.value || !f.formapago.value || !f.inicio.value || !f.fin.value){
@@ -1933,18 +2212,70 @@
       valid = false;
       alert("Seleccione al menos una fuente de financiación.");
     }
+
+    var identificacionVal = onlyDigits(f.identificacion.value);
+    var nombreVal = f.nombre.value.trim();
+    var requiereFoto = !!(identificacionVal || nombreVal);
+    if (requiereFoto && !fotoFile && !fotoUrlActual){
+      document.getElementById("err_foto").textContent = "Debe cargar la foto del contratista cuando diligencia identificación o nombre.";
+      valid = false;
+    }
+
+    var vigenciaVal = document.querySelector('input[name="f_vigencia"]:checked').value;
+    var vfTipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
+    var vfTipoVal = vfTipoEl ? vfTipoEl.value : "";
+    var payloadVigencia = [];
+    if (vigenciaVal === "si"){
+      if (!vfTipoVal){
+        document.getElementById("err_vigencia").textContent = "Indique si la vigencia futura es ordinaria o excepcional.";
+        valid = false;
+      } else if (vfTipoVal === "ordinaria"){
+        if (vigenciaDraft[2026].length === 0 || vigenciaDraft[2027].length === 0){
+          document.getElementById("err_vigencia").textContent = "La vigencia futura ordinaria requiere al menos una fuente y valor para 2026 y para 2027.";
+          valid = false;
+        } else {
+          vigenciaDraft[2026].forEach(function(r){ payloadVigencia.push({ anio: 2026, fuente: r.fuente, valor: r.valor }); });
+          vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+        }
+      } else if (vfTipoVal === "excepcional"){
+        if (vigenciaDraft[2027].length === 0){
+          document.getElementById("err_vigencia").textContent = "La vigencia futura excepcional requiere al menos una fuente y valor para 2027.";
+          valid = false;
+        } else {
+          vigenciaDraft[2027].forEach(function(r){ payloadVigencia.push({ anio: 2027, fuente: r.fuente, valor: r.valor }); });
+        }
+      }
+    }
+
     if (!valid) return;
+
+    var saveBtn = document.getElementById("btnSaveItem");
+    saveBtn.disabled = true; saveBtn.textContent = "Guardando...";
+
+    var fotoUrlFinal = fotoUrlActual;
+    if (fotoFile){
+      var ext = (fotoFile.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g,"") || "jpg";
+      var path = currentSecretariaId + "/" + (editingId || uid()) + "_" + Date.now() + "." + ext;
+      var upRes = await sb.storage.from("fotos-contratistas").upload(path, fotoFile, { upsert: true, contentType: fotoFile.type || undefined });
+      if (upRes.error){
+        saveBtn.disabled = false; saveBtn.textContent = "Guardar necesidad";
+        alert("No se pudo subir la foto: " + upRes.error.message);
+        return;
+      }
+      fotoUrlFinal = sb.storage.from("fotos-contratistas").getPublicUrl(path).data.publicUrl;
+    }
 
     var payloadItem = {
       id: editingId || null,
       secretaria_id: currentSecretariaId,
-      identificacion_tercero: onlyDigits(f.identificacion.value),
-      nombre_tercero: f.nombre.value.trim(),
+      identificacion_tercero: identificacionVal,
+      nombre_tercero: nombreVal,
       actividad: f.actividad.value.trim(),
       objeto: f.objeto.value.trim(),
       servicio_contratar: f.servicio.value,
-      bpin: bpinDraft,
-      indicador: indicadorDraft.map(function(r){ return { codigo: r.codigo, porcentaje: Number(r.porcentaje)||0 }; }),
+      bpin: esFuncionamiento ? [] : bpinDraft,
+      indicador: esFuncionamiento ? [] : indicadorDraft.map(function(r){ return { codigo: r.codigo, porcentaje: Number(r.porcentaje)||0 }; }),
+      tipo_necesidad: currentTipoNecesidad,
       tipo_contrato: f.tipo.value,
       modalidad_seleccion: f.modalidad.value,
       forma_pago: f.formapago.value,
@@ -1952,16 +2283,16 @@
       fecha_fin: f.fin.value,
       honorarios: onlyDigits(f.honorarios.value) || null,
       total: totalVal,
-      vigencia_futura: document.querySelector('input[name="f_vigencia"]:checked').value,
+      vigencia_futura: vigenciaVal,
+      vigencia_futura_tipo: vigenciaVal === "si" ? vfTipoVal : null,
+      foto_url: fotoUrlFinal,
       justificacion_tecnica: f.justTecnica.value.trim(),
       justificacion_juridica: f.justJuridica.value.trim(),
       articulo_ley: f.articulo.value.trim()
     };
     var payloadFuentes = fuentesDraft.map(function(nombre){ return { nombre: String(nombre).trim(), valor: 0 }; });
 
-    var saveBtn = document.getElementById("btnSaveItem");
-    saveBtn.disabled = true; saveBtn.textContent = "Guardando...";
-    var res = await sb.rpc("guardar_necesidad", { p_item: payloadItem, p_fuentes: payloadFuentes });
+    var res = await sb.rpc("guardar_necesidad", { p_item: payloadItem, p_fuentes: payloadFuentes, p_vigencia: payloadVigencia });
     saveBtn.disabled = false; saveBtn.textContent = "Guardar necesidad";
 
     if (res.error){
