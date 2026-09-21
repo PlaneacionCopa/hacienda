@@ -2073,10 +2073,25 @@
     });
     renderVfSummary();
   }
+  // Cuánto queda disponible para agregar sin superar el Total proyección del contrato
+  function vfDisponible(){
+    var tipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
+    var tipo = tipoEl ? tipoEl.value : "";
+    var totalContrato = Number(onlyDigits(f.total.value)) || 0;
+    var suma2026 = vigenciaDraft[2026].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var suma2027 = vigenciaDraft[2027].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
+    var sumaActual = tipo === "ordinaria" ? (suma2026 + suma2027) : suma2027;
+    return totalContrato - sumaActual;
+  }
   document.getElementById("btnAddVf2026").addEventListener("click", function(){
     var fuente = f.vf2026Fuente.value;
     var valor = Number(onlyDigits(f.vf2026Valor.value)) || 0;
     if (!fuente || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0 para la vigencia futura 2026."); return; }
+    var disponible2026 = vfDisponible();
+    if (valor > disponible2026){
+      alert("Ese valor supera lo disponible. Solo puede agregar hasta " + fmtCOP(Math.max(disponible2026,0)) + " sin superar el Total proyección del contrato (" + fmtCOP(Number(onlyDigits(f.total.value))||0) + ").");
+      return;
+    }
     vigenciaDraft[2026].push({ fuente: fuente, valor: valor });
     f.vf2026Fuente.value = ""; f.vf2026Valor.value = "";
     renderVfList(2026);
@@ -2085,6 +2100,11 @@
     var fuente = f.vf2027Fuente.value;
     var valor = Number(onlyDigits(f.vf2027Valor.value)) || 0;
     if (!fuente || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0 para la vigencia futura 2027."); return; }
+    var disponible2027 = vfDisponible();
+    if (valor > disponible2027){
+      alert("Ese valor supera lo disponible. Solo puede agregar hasta " + fmtCOP(Math.max(disponible2027,0)) + " sin superar el Total proyección del contrato (" + fmtCOP(Number(onlyDigits(f.total.value))||0) + ").");
+      return;
+    }
     vigenciaDraft[2027].push({ fuente: fuente, valor: valor });
     f.vf2027Fuente.value = ""; f.vf2027Valor.value = "";
     renderVfList(2027);
