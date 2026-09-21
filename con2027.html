@@ -1379,11 +1379,10 @@
   // ---------- Vista de captura: setup según rol ----------
   function setupCaptureControls(){
     // La pseudo-secretaría "O" (necesidades ocultas) solo la puede ver y elegir el admin
-    var catalogoVisible = profile.role === "admin" ? secretariasCatalog : secretariasCatalog.filter(function(s){ return s.id !== "oculto"; });
-    fillSelect(els.secretariaSelect, catalogoVisible.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
+    fillSelect(els.secretariaSelect, secretariasCatalog.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
     if (profile.role === "admin"){
       els.secretariaSelect.disabled = false;
-      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas.";
+      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría.";
     } else {
       els.secretariaSelect.disabled = true;
       els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
@@ -1433,6 +1432,7 @@
         bpin: i.bpin || [],
         indicador: i.indicador || [],
         tipoNecesidad: i.tipo_necesidad || "inversion",
+        oculto: !!i.oculto,
         tipoContrato: i.tipo_contrato,
         modalidadSeleccion: i.modalidad_seleccion,
         formaPago: i.forma_pago,
@@ -1469,15 +1469,14 @@
   }
 
   function renderTopControls(){
-    var esOcultos = currentSecretariaId === "oculto";
     var enviado = state.status === "enviado";
     els.statusPill.className = "status-pill " + (enviado ? "status-enviado" : "status-borrador");
     els.statusPill.textContent = enviado ? "✔ Enviado" : "● Borrador";
-    els.enviadoBanner.style.display = (enviado && !esOcultos) ? "flex" : "none";
-    els.btnReabrir.style.display = (enviado && profile.role === "admin" && !esOcultos) ? "inline-flex" : "none";
-    els.itemsToolbarTitle.textContent = esOcultos ? "Necesidades ocultas" : "Necesidades priorizadas";
-    els.btnAdd.style.display = esOcultos ? "none" : "inline-flex";
-    els.btnEnviar.style.display = esOcultos ? "none" : "inline-flex";
+    els.enviadoBanner.style.display = enviado ? "flex" : "none";
+    els.btnReabrir.style.display = (enviado && profile.role === "admin") ? "inline-flex" : "none";
+    els.itemsToolbarTitle.textContent = "Necesidades priorizadas";
+    els.btnAdd.style.display = "inline-flex";
+    els.btnEnviar.style.display = "inline-flex";
     els.btnAdd.disabled = isLocked();
     els.btnEnviar.disabled = enviado || state.items.length === 0;
   }
@@ -1510,6 +1509,7 @@
         (item.fotoUrl ? '<img src="' + escapeHtml(item.fotoUrl) + '" class="foto-thumb" alt="">' : '') +
         '<div class="item-objeto" style="display:inline;">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
         '<div class="item-tags">' +
+          (item.oculto ? '<span class="tag tag-oculto">🙈 Oculto — no cuenta en los totales</span>' : '') +
           '<span class="tag">' + (item.tipoNecesidad === "funcionamiento" ? "Funcionamiento" : "Inversión") + '</span>' +
           '<span class="tag">' + escapeHtml(item.servicioContratar || "Servicio no definido") + '</span>' +
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
@@ -1545,15 +1545,15 @@
         actions.appendChild(delBtn);
       }
       if (profile.role === "admin"){
-        var enOcultos = currentSecretariaId === "oculto";
+        var yaOculto = !!item.oculto;
         var hideBtn = document.createElement("button");
         hideBtn.className = "btn btn-danger-text btn-sm";
-        hideBtn.textContent = enOcultos ? "Reactivar" : "Ocultar";
+        hideBtn.textContent = yaOculto ? "Reactivar" : "Ocultar";
         hideBtn.onclick = async function(){
-          var msg = enOcultos ? "¿Reactivar esta necesidad y devolverla a su secretaría de origen?" : "¿Ocultar esta necesidad? No contará en los totales hasta que la reactive.";
+          var msg = yaOculto ? "¿Reactivar esta necesidad? Volverá a contar en los totales." : "¿Ocultar esta necesidad? No contará en los totales del admin ni del alcalde hasta que la reactive. La secretaría la seguirá viendo en su lista.";
           if (!confirm(msg)) return;
-          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !enOcultos });
-          if (res.error){ alert("No se pudo " + (enOcultos ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
+          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !yaOculto });
+          if (res.error){ alert("No se pudo " + (yaOculto ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
           await loadSecretariaData();
         };
         actions.appendChild(hideBtn);
