@@ -224,13 +224,29 @@
 
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
-    width:64px;height:64px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
-    background:var(--navy-050);flex-shrink:0;
+    width:96px;height:120px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
+    background:var(--navy-050);flex-shrink:0;cursor:zoom-in;
   }
   .foto-thumb{
     width:32px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--line);
-    vertical-align:middle;margin-right:.4rem;
+    vertical-align:middle;margin-right:.4rem;cursor:zoom-in;
   }
+
+  .foto-lightbox{
+    position:fixed;inset:0;background:rgba(10,15,30,.8);z-index:80;
+    display:none;align-items:center;justify-content:center;padding:2rem 1rem;
+  }
+  .foto-lightbox.open{display:flex;}
+  .foto-lightbox-inner{
+    background:var(--paper);border-radius:14px;max-width:420px;width:100%;
+    box-shadow:0 30px 60px rgba(0,0,0,.5);overflow:hidden;
+  }
+  .foto-lightbox-inner img{width:100%;display:block;max-height:70vh;object-fit:contain;background:var(--navy-050);}
+  .foto-lightbox-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:.8rem 1.1rem;border-bottom:1px solid var(--line);
+  }
+  .foto-lightbox-head h4{margin:0;font-size:.9rem;}
 
   .tipo-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;padding:1.2rem 1.4rem;}
   @media (max-width:520px){ .tipo-choice-grid{grid-template-columns:1fr;} }
@@ -359,10 +375,9 @@
     </div>
 
     <div class="toolbar">
-      <h2>Necesidades priorizadas</h2>
+      <h2 id="itemsToolbarTitle">Necesidades priorizadas</h2>
       <div style="display:flex;gap:.6rem;">
         <button class="btn btn-ghost" id="btnAdd">＋ Agregar necesidad</button>
-        <button class="btn btn-ghost" id="btnVerOcultos" style="display:none;">🙈 Ocultos (<span id="ocultosCount">0</span>)</button>
         <button class="btn btn-success" id="btnEnviar">Enviar lista definitiva</button>
       </div>
     </div>
@@ -373,11 +388,6 @@
     </div>
 
     <div id="itemsList" class="items"></div>
-
-    <div id="ocultosPanel" style="display:none;border-top:1px solid var(--line);">
-      <div class="toolbar"><h2>Necesidades ocultas de esta secretaría</h2></div>
-      <div id="ocultosList" class="items"></div>
-    </div>
   </div>
 
   <!-- Vista del alcalde (solo lectura, con gráficas) -->
@@ -451,6 +461,17 @@
   </div>
 </div>
 
+<!-- Lightbox: foto del contratista en grande (hoja de vida) -->
+<div class="foto-lightbox" id="fotoLightbox">
+  <div class="foto-lightbox-inner">
+    <div class="foto-lightbox-head">
+      <h4 id="fotoLightboxTitle">Foto del contratista</h4>
+      <button class="modal-close" id="btnCloseFotoLightbox">×</button>
+    </div>
+    <img id="fotoLightboxImg" src="" alt="Foto del contratista en grande">
+  </div>
+</div>
+
 <!-- Modal agregar/editar -->
 <div class="overlay" id="overlay">
   <div class="modal">
@@ -475,10 +496,10 @@
         <div class="field" style="margin-top:.9rem;">
           <label for="f_foto" id="lblFoto">Foto del contratista</label>
           <div class="foto-row">
-            <img id="fotoPreview" class="foto-preview" style="display:none;" alt="Foto del contratista">
+            <img id="fotoPreview" class="foto-preview" style="display:none;" alt="Foto del contratista" title="Clic para ampliar">
             <input type="file" id="f_foto" accept="image/*" style="max-width:260px;">
           </div>
-          <div class="hint">Obligatoria si diligencia identificación o nombre del tercero.</div>
+          <div class="hint" id="fotoHint">Obligatoria si diligencia identificación o nombre del tercero (solo aplica a Inversión; en Funcionamiento es opcional, ya que puede ser una empresa).</div>
           <div class="error-text" id="err_foto"></div>
         </div>
       </div>
@@ -1249,10 +1270,7 @@
     btnAdd: document.getElementById("btnAdd"),
     btnEnviar: document.getElementById("btnEnviar"),
     btnReabrir: document.getElementById("btnReabrir"),
-    btnVerOcultos: document.getElementById("btnVerOcultos"),
-    ocultosPanel: document.getElementById("ocultosPanel"),
-    ocultosList: document.getElementById("ocultosList"),
-    ocultosCount: document.getElementById("ocultosCount"),
+    itemsToolbarTitle: document.getElementById("itemsToolbarTitle"),
     overlay: document.getElementById("overlay"),
     modalTitle: document.getElementById("modalTitle")
   };
@@ -1360,10 +1378,12 @@
 
   // ---------- Vista de captura: setup según rol ----------
   function setupCaptureControls(){
-    fillSelect(els.secretariaSelect, secretariasCatalog.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
+    // La pseudo-secretaría "O" (necesidades ocultas) solo la puede ver y elegir el admin
+    var catalogoVisible = profile.role === "admin" ? secretariasCatalog : secretariasCatalog.filter(function(s){ return s.id !== "oculto"; });
+    fillSelect(els.secretariaSelect, catalogoVisible.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
     if (profile.role === "admin"){
       els.secretariaSelect.disabled = false;
-      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría.";
+      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas.";
     } else {
       els.secretariaSelect.disabled = true;
       els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
@@ -1383,7 +1403,7 @@
     var listaRes = await sb.from("priorizacion_listas").select("status").eq("secretaria_id", currentSecretariaId).single();
     state.status = (listaRes.data && listaRes.data.status) || "borrador";
 
-    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).eq("oculto", false).order("created_at", { ascending: true });
+    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).order("created_at", { ascending: true });
     var rawItems = itemsRes.data || [];
     var itemIds = rawItems.map(function(i){ return i.id; });
 
@@ -1433,41 +1453,7 @@
 
     renderAll();
     subscribeRealtimeCaptura();
-    if (profile.role === "admin"){
-      els.btnVerOcultos.style.display = "inline-flex";
-      await loadOcultos();
-    }
   }
-
-  // ---------- Ocultos de la secretaría actual (solo admin) ----------
-  async function loadOcultos(){
-    if (!currentSecretariaId) return;
-    var res = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).eq("oculto", true).order("oculto_at", { ascending: false });
-    var rows = res.data || [];
-    els.ocultosCount.textContent = rows.length;
-    els.ocultosList.innerHTML = rows.map(function(i){
-      return '<div class="item-card">' +
-        '<div class="item-top">' +
-        '<div><div class="item-objeto">' + escapeHtml(i.objeto || "(Sin objeto)") + '</div>' +
-        '<div class="item-tags"><span class="tag tag-oculto">Oculto</span>' +
-        '<span class="tag">' + escapeHtml(tipoLabel(i.tipo_contrato)) + '</span></div></div>' +
-        '<div style="display:flex;align-items:center;gap:.8rem;">' +
-        '<div class="total" style="font-weight:800;">' + fmtCOP(i.total) + '</div>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-reactivar="' + i.id + '">Reactivar</button>' +
-        '</div></div></div>';
-    }).join("") || "<p style='padding:0 1.4rem 1rem;color:var(--ink-soft);'>No hay necesidades ocultas.</p>";
-    els.ocultosList.querySelectorAll("[data-reactivar]").forEach(function(btn){
-      btn.addEventListener("click", async function(){
-        var res2 = await sb.rpc("ocultar_necesidad", { p_item_id: btn.getAttribute("data-reactivar"), p_oculto: false });
-        if (res2.error){ alert("No se pudo reactivar: " + res2.error.message); return; }
-        await loadSecretariaData();
-      });
-    });
-  }
-  els.btnVerOcultos.addEventListener("click", function(){
-    var showing = els.ocultosPanel.style.display !== "none";
-    els.ocultosPanel.style.display = showing ? "none" : "block";
-  });
 
   function subscribeRealtimeCaptura(){
     if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
@@ -1483,11 +1469,15 @@
   }
 
   function renderTopControls(){
+    var esOcultos = currentSecretariaId === "oculto";
     var enviado = state.status === "enviado";
     els.statusPill.className = "status-pill " + (enviado ? "status-enviado" : "status-borrador");
     els.statusPill.textContent = enviado ? "✔ Enviado" : "● Borrador";
-    els.enviadoBanner.style.display = enviado ? "flex" : "none";
-    els.btnReabrir.style.display = (enviado && profile.role === "admin") ? "inline-flex" : "none";
+    els.enviadoBanner.style.display = (enviado && !esOcultos) ? "flex" : "none";
+    els.btnReabrir.style.display = (enviado && profile.role === "admin" && !esOcultos) ? "inline-flex" : "none";
+    els.itemsToolbarTitle.textContent = esOcultos ? "Necesidades ocultas" : "Necesidades priorizadas";
+    els.btnAdd.style.display = esOcultos ? "none" : "inline-flex";
+    els.btnEnviar.style.display = esOcultos ? "none" : "inline-flex";
     els.btnAdd.disabled = isLocked();
     els.btnEnviar.disabled = enviado || state.items.length === 0;
   }
@@ -1528,6 +1518,12 @@
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' : '') +
         '</div>';
+      var thumbEl = left.querySelector(".foto-thumb");
+      if (thumbEl){
+        thumbEl.addEventListener("click", function(){
+          openFotoLightbox(item.fotoUrl, item.nombreTercero || item.objeto || "Foto del contratista");
+        });
+      }
 
       var actions = document.createElement("div");
       actions.className = "item-actions";
@@ -1549,13 +1545,15 @@
         actions.appendChild(delBtn);
       }
       if (profile.role === "admin"){
+        var enOcultos = currentSecretariaId === "oculto";
         var hideBtn = document.createElement("button");
         hideBtn.className = "btn btn-danger-text btn-sm";
-        hideBtn.textContent = "Ocultar";
+        hideBtn.textContent = enOcultos ? "Reactivar" : "Ocultar";
         hideBtn.onclick = async function(){
-          if (!confirm("¿Ocultar esta necesidad? No contará en los totales hasta que la reactive.")) return;
-          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: true });
-          if (res.error){ alert("No se pudo ocultar: " + res.error.message); return; }
+          var msg = enOcultos ? "¿Reactivar esta necesidad y devolverla a su secretaría de origen?" : "¿Ocultar esta necesidad? No contará en los totales hasta que la reactive.";
+          if (!confirm(msg)) return;
+          var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !enOcultos });
+          if (res.error){ alert("No se pudo " + (enOcultos ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
           await loadSecretariaData();
         };
         actions.appendChild(hideBtn);
@@ -1605,7 +1603,7 @@
     var resumenRes = await sb.from("priorizacion_resumen").select("*").order("total_proyectado", { ascending: false });
     var resumen = resumenRes.data || [];
 
-    var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar");
+    var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar").eq("oculto", false);
     var items = itemsRes.data || [];
 
     var totalGeneral = resumen.reduce(function(s,r){ return s + Number(r.total_proyectado||0); }, 0);
@@ -1764,17 +1762,26 @@
     }
     btn.disabled = true; btn.textContent = "Generando...";
     try{
-      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").order("secretaria_id", { ascending: true });
+      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").eq("oculto", false).order("secretaria_id", { ascending: true });
       if (itemsRes.error) throw itemsRes.error;
       var items = itemsRes.data || [];
 
-      var itemIds = items.map(function(i){ return i.id; });
+      var ocultosRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").eq("oculto", true).order("oculto_at", { ascending: false });
+      var ocultos = ocultosRes.data || [];
+
+      var allIds = items.map(function(i){ return i.id; }).concat(ocultos.map(function(i){ return i.id; }));
       var fuentesByItem = {};
-      if (itemIds.length){
-        var fRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", itemIds);
+      var vigenciaByItem = {};
+      if (allIds.length){
+        var fRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", allIds);
         (fRes.data || []).forEach(function(row){
           if (!fuentesByItem[row.item_id]) fuentesByItem[row.item_id] = [];
           fuentesByItem[row.item_id].push(row.nombre);
+        });
+        var vfRes = await sb.from("priorizacion_vigencia_futura").select("*").in("item_id", allIds);
+        (vfRes.data || []).forEach(function(row){
+          if (!vigenciaByItem[row.item_id]) vigenciaByItem[row.item_id] = [];
+          vigenciaByItem[row.item_id].push(row);
         });
       }
 
@@ -1783,14 +1790,14 @@
       (listasRes.data || []).forEach(function(l){ listaBySec[l.secretaria_id] = l; });
 
       var headers = [
-        "Secretaría","Estado de la lista","Identificación tercero","Nombre tercero","Actividad",
-        "Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
+        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","Foto",
+        "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
-        "Honorarios mensuales","Total proyectado","¿Vigencia futura?","Fuentes de financiación",
+        "Honorarios mensuales","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
         "Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
       ];
 
-      var rows = items.map(function(i){
+      function filaDe(i){
         var lista = listaBySec[i.secretaria_id];
         var estado = lista && lista.status === "enviado" ? "Enviado" : "Borrador";
         var bpinTxt = Array.isArray(i.bpin) ? i.bpin.join(" | ") : "";
@@ -1799,11 +1806,17 @@
         }).join(" | ") : "";
         var fuentesTxt = (fuentesByItem[i.id] || []).join(" | ");
         var dias = calcDiasInclusive(i.fecha_inicio, i.fecha_fin);
+        var vigenciaTxt = i.vigencia_futura === "si" ? ("Sí (" + (i.vigencia_futura_tipo === "ordinaria" ? "Ordinaria" : "Excepcional") + ")") : "No";
+        var vigenciaDetalle = (vigenciaByItem[i.id] || []).map(function(v){
+          return v.anio + " - " + v.fuente + ": " + fmtCOP(v.valor);
+        }).join(" | ");
         return [
           i.secretarias ? i.secretarias.nombre : i.secretaria_id,
           estado,
+          i.tipo_necesidad === "funcionamiento" ? "Funcionamiento" : "Inversión",
           i.identificacion_tercero || "",
           i.nombre_tercero || "",
+          i.foto_url || "",
           i.actividad || "",
           i.objeto || "",
           i.servicio_contratar || "",
@@ -1817,20 +1830,29 @@
           dias,
           Number(i.honorarios) || 0,
           Number(i.total) || 0,
-          i.vigencia_futura === "si" ? "Sí" : "No",
+          vigenciaTxt,
+          vigenciaDetalle,
           fuentesTxt,
           i.justificacion_tecnica || "",
           i.justificacion_juridica || "",
           i.articulo_ley || "",
           i.created_at ? new Date(i.created_at).toLocaleString("es-CO") : ""
         ];
-      });
+      }
 
+      var rows = items.map(filaDe);
       var wsData = [headers].concat(rows);
       var ws = XLSX.utils.aoa_to_sheet(wsData);
       ws["!cols"] = headers.map(function(){ return { wch: 24 }; });
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Priorizacion 2027");
+
+      if (ocultos.length){
+        var rowsOc = ocultos.map(filaDe);
+        var wsOc = XLSX.utils.aoa_to_sheet([headers].concat(rowsOc));
+        wsOc["!cols"] = headers.map(function(){ return { wch: 24 }; });
+        XLSX.utils.book_append_sheet(wb, wsOc, "Ocultos");
+      }
 
       var fecha = new Date().toISOString().slice(0,10);
       XLSX.writeFile(wb, "priorizacion_contratacion_2027_" + fecha + ".xlsx");
@@ -2032,7 +2054,7 @@
       var div = document.createElement("div");
       div.className = "vf-row";
       div.innerHTML =
-        '<span>' + escapeHtml(labelFromOptions(FUENTES_OPTIONS.map(function(o){return {v:o,l:o};}), row.fuente)) + '</span>' +
+        '<span>' + escapeHtml(row.fuente) + '</span>' +
         '<span class="vf-valor">' + fmtCOP(row.valor) + '</span>' +
         '<button type="button" data-vf-remove="' + idx + '">×</button>';
       el.appendChild(div);
@@ -2089,6 +2111,21 @@
       img.style.display = "block";
     };
     reader.readAsDataURL(file);
+  });
+
+  // Vista ampliada de la foto (estilo hoja de vida), abre con cualquier foto ya cargada
+  var fotoLightbox = document.getElementById("fotoLightbox");
+  function openFotoLightbox(src, titulo){
+    if (!src) return;
+    document.getElementById("fotoLightboxImg").src = src;
+    document.getElementById("fotoLightboxTitle").textContent = titulo || "Foto del contratista";
+    fotoLightbox.classList.add("open");
+  }
+  function closeFotoLightbox(){ fotoLightbox.classList.remove("open"); }
+  document.getElementById("btnCloseFotoLightbox").addEventListener("click", closeFotoLightbox);
+  fotoLightbox.addEventListener("click", function(e){ if (e.target === fotoLightbox) closeFotoLightbox(); });
+  document.getElementById("fotoPreview").addEventListener("click", function(){
+    openFotoLightbox(this.src, f.nombre.value.trim() || "Foto del contratista");
   });
 
   function clearErrors(){
@@ -2150,6 +2187,7 @@
     updateVigenciaVisibility();
 
     fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return x.nombre; }) : [];
+    renderFuentesChosen();
 
     fotoFile = null;
     fotoUrlActual = item ? (item.fotoUrl || null) : null;
@@ -2158,11 +2196,10 @@
     if (fotoUrlActual){ fotoImg.src = fotoUrlActual; fotoImg.style.display = "block"; }
     else { fotoImg.style.display = "none"; fotoImg.src = ""; }
 
-    var allInputs = document.querySelectorAll("#modalBody input, #modalBody select, #modalBody textarea");
+    var allInputs = document.querySelectorAll("#modalBody input, #modalBody select, #modalBody textarea, #modalBody button");
     allInputs.forEach(function(el){ el.disabled = locked; });
     document.getElementById("btnSaveItem").style.display = locked ? "none" : "inline-flex";
 
-    renderFuentesChosen();
     updateDiasYTotal();
 
     els.overlay.classList.add("open");
@@ -2215,7 +2252,8 @@
 
     var identificacionVal = onlyDigits(f.identificacion.value);
     var nombreVal = f.nombre.value.trim();
-    var requiereFoto = !!(identificacionVal || nombreVal);
+    // La foto solo es obligatoria en Inversión (en Funcionamiento el contratista puede ser una empresa)
+    var requiereFoto = !esFuncionamiento && !!(identificacionVal || nombreVal);
     if (requiereFoto && !fotoFile && !fotoUrlActual){
       document.getElementById("err_foto").textContent = "Debe cargar la foto del contratista cuando diligencia identificación o nombre.";
       valid = false;
