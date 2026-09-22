@@ -621,13 +621,15 @@
           </div>
 
           <div id="vf2026Block" class="vf-block" style="display:none;">
-            <h4>Vigencia 2026 </h4>
+            <h4>Vigencia futura 2026 — pasa recursos de este año al próximo</h4>
+            <div class="vf-warning">⚠ Se debe garantizar como mínimo el 15% del valor total del contrato con recursos de la vigencia actual (2026).</div>
             <div class="vf-add-row">
               <div class="field"><label for="f_vf2026_fuente">Fuente</label><select id="f_vf2026_fuente"></select></div>
               <div class="field"><label for="f_vf2026_valor">Valor</label><input id="f_vf2026_valor" inputmode="numeric" placeholder="0"></div>
               <button type="button" class="btn btn-ghost btn-sm" id="btnAddVf2026">Agregar</button>
             </div>
             <div id="vf2026List" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
+            <div class="vf-summary" id="vf2026PctCheck"></div>
           </div>
 
           <div id="vf2027Block" class="vf-block" style="display:none;">
@@ -2136,11 +2138,12 @@
   // Muestra en vivo si la suma de las fuentes de vigencia futura ya iguala el Total proyección del contrato
   function renderVfSummary(){
     var el = document.getElementById("vfSummary");
+    var pctEl = document.getElementById("vf2026PctCheck");
     var esSi = document.querySelector('input[name="f_vigencia"]:checked').value === "si";
-    if (!esSi){ el.className = "vf-summary"; el.textContent = ""; return; }
+    if (!esSi){ el.className = "vf-summary"; el.textContent = ""; pctEl.className = "vf-summary"; pctEl.textContent = ""; return; }
     var tipoEl = document.querySelector('input[name="f_vigencia_tipo"]:checked');
     var tipo = tipoEl ? tipoEl.value : "";
-    if (!tipo){ el.className = "vf-summary"; el.textContent = ""; return; }
+    if (!tipo){ el.className = "vf-summary"; el.textContent = ""; pctEl.className = "vf-summary"; pctEl.textContent = ""; return; }
     var totalContrato = Number(onlyDigits(f.total.value)) || 0;
     var suma2026 = vigenciaDraft[2026].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
     var suma2027 = vigenciaDraft[2027].reduce(function(s,r){ return s + (Number(r.valor)||0); }, 0);
@@ -2154,6 +2157,21 @@
       var diff = totalContrato - sumaTotal;
       var diffTxt = diff > 0 ? ("Falta " + fmtCOP(diff)) : ("Sobran " + fmtCOP(Math.abs(diff)));
       el.textContent = etiquetaSuma + ": " + fmtCOP(sumaTotal) + " de " + fmtCOP(totalContrato) + " (Total proyección del contrato). " + diffTxt + ".";
+    }
+
+    // Mínimo 15% del valor total debe quedar cubierto con recursos de la vigencia actual (2026), solo aplica a ordinaria
+    if (tipo === "ordinaria" && totalContrato > 0){
+      var minimo15 = Math.round(totalContrato * 0.15);
+      var pctActual = Math.round((suma2026 / totalContrato) * 10000) / 100;
+      var okPct = suma2026 >= minimo15;
+      pctEl.className = "vf-summary " + (okPct ? "ok" : "bad");
+      if (okPct){
+        pctEl.textContent = "✓ Vigencia actual (2026): " + fmtCOP(suma2026) + " (" + pctActual + "%) — cumple el mínimo del 15% (" + fmtCOP(minimo15) + ").";
+      } else {
+        pctEl.textContent = "Vigencia actual (2026): " + fmtCOP(suma2026) + " (" + pctActual + "%). Debe ser mínimo el 15% del total (" + fmtCOP(minimo15) + "). Faltan " + fmtCOP(minimo15 - suma2026) + ".";
+      }
+    } else {
+      pctEl.className = "vf-summary"; pctEl.textContent = "";
     }
   }
 
