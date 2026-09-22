@@ -224,6 +224,7 @@
   .vf-summary{margin-top:.6rem;padding:.55rem .7rem;border-radius:10px;font-size:.82rem;font-weight:600;display:none;}
   .vf-summary.ok{display:block;background:#e6f6ec;color:#166534;border:1px solid #86d3a3;}
   .vf-summary.bad{display:block;background:#fdecec;color:#a3231f;border:1px solid #f3b6b4;}
+  .vf-warning{margin-bottom:.7rem;padding:.6rem .75rem;border-radius:10px;font-size:.8rem;font-weight:600;background:#fff7e6;color:#92400e;border:1px solid #f5d38b;}
 
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
@@ -485,7 +486,7 @@
     <div class="modal-body" id="modalBody">
 
       <div>
-        <div class="section-label">Identificación (opcional)</div>
+        <div class="section-label">Identificación</div>
         <div class="grid2" style="margin-top:.6rem;">
           <div class="field">
             <label for="f_identificacion">Identificación del tercero</label>
@@ -502,8 +503,18 @@
             <img id="fotoPreview" class="foto-preview" style="display:none;" alt="Foto del contratista" title="Clic para ampliar">
             <input type="file" id="f_foto" accept="image/*" style="max-width:260px;">
           </div>
-          <div class="hint" id="fotoHint">Obligatoria si diligencia identificación o nombre del tercero (solo aplica a Inversión; en Funcionamiento es opcional, ya que puede ser una empresa).</div>
+          <div class="hint" id="fotoHint">Solo Para contratos de inversión</div>
           <div class="error-text" id="err_foto"></div>
+        </div>
+        <div class="grid2" style="margin-top:.9rem;">
+          <div class="field">
+            <label for="f_honorarios2026">Valor honorarios 2026</label>
+            <input id="f_honorarios2026" inputmode="numeric" placeholder="Ej: 3.000.000">
+          </div>
+          <div class="field">
+            <label for="f_linksecop">Link del SECOP del contrato actual</label>
+            <input id="f_linksecop" type="url" placeholder="https://community.secop.gov.co/...">
+          </div>
         </div>
       </div>
 
@@ -582,7 +593,7 @@
           <div class="field">
             <label for="f_honorarios">Honorarios mensuales</label>
             <input id="f_honorarios" inputmode="numeric" placeholder="Ej: 3.000.000">
-            <div class="hint" id="honorariosHint">Valor mensual pactado con el contratista (no aplica escala salarial de funcionarios).</div>
+            <div class="hint" id="honorariosHint">Valor mensual pactado con el contratista.</div>
           </div>
           <div class="field">
             <label for="f_total" class="req">Total proyección del contrato</label>
@@ -600,6 +611,7 @@
         </div>
 
         <div id="vfTipoWrap" style="display:none;margin-top:.7rem;">
+          <div class="vf-warning">⚠ La vigencia futura solo es posible si el Concejo Municipal aprueba el acuerdo municipal correspondiente que la autorice.</div>
           <div class="field">
             <label>¿Ordinaria o excepcional?</label>
             <div class="radio-group">
@@ -1243,6 +1255,11 @@
   var profile = null; // {id, full_name, role, secretaria_id}
   var secretariasCatalog = []; // [{id, nombre}]
   var currentSecretariaId = null;
+
+  // Secretarías que pueden elegir entre Inversión y Funcionamiento (el resto solo maneja Inversión)
+  var SECRETARIAS_CON_FUNCIONAMIENTO = ["serv_admin", "dir_financiera", "hacienda", "juridica", "control_interno", "control_interno_disciplinario"];
+  // De esas, las que SOLO manejan Funcionamiento (no tienen Inversión / Plan de Desarrollo)
+  var SECRETARIAS_SOLO_FUNCIONAMIENTO = ["control_interno", "control_interno_disciplinario"];
   var state = { status: "borrador", items: [] };
   var editingId = null;
   var fuentesDraft = [];
@@ -1444,6 +1461,8 @@
         fechaInicio: i.fecha_inicio,
         fechaFin: i.fecha_fin,
         honorarios: i.honorarios,
+        honorarios2026: i.honorarios_2026,
+        linkSecop: i.link_secop,
         total: Number(i.total) || 0,
         vigenciaFutura: i.vigencia_futura,
         vigenciaFuturaTipo: i.vigencia_futura_tipo,
@@ -1799,8 +1818,8 @@
         "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
-        "Honorarios mensuales","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
-        "Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
+        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
+        "Link SECOP contrato actual","Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
       ];
 
       function filaDe(i){
@@ -1835,10 +1854,12 @@
           i.fecha_fin || "",
           dias,
           Number(i.honorarios) || 0,
+          Number(i.honorarios_2026) || 0,
           Number(i.total) || 0,
           vigenciaTxt,
           vigenciaDetalle,
           fuentesTxt,
+          i.link_secop || "",
           i.justificacion_tecnica || "",
           i.justificacion_juridica || "",
           i.articulo_ley || "",
@@ -1887,6 +1908,8 @@
     fin: document.getElementById("f_fin"),
     dias: document.getElementById("f_dias"),
     honorarios: document.getElementById("f_honorarios"),
+    honorarios2026: document.getElementById("f_honorarios2026"),
+    linkSecop: document.getElementById("f_linksecop"),
     total: document.getElementById("f_total"),
     justTecnica: document.getElementById("f_just_tecnica"),
     justJuridica: document.getElementById("f_just_juridica"),
@@ -2222,6 +2245,8 @@
     f.inicio.value = item ? item.fechaInicio || "" : "";
     f.fin.value = item ? item.fechaFin || "" : "";
     f.honorarios.value = item && item.honorarios ? Number(item.honorarios).toLocaleString("es-CO") : "";
+    f.honorarios2026.value = item && item.honorarios2026 ? Number(item.honorarios2026).toLocaleString("es-CO") : "";
+    f.linkSecop.value = item ? item.linkSecop || "" : "";
     f.total.value = item && item.total ? Number(item.total).toLocaleString("es-CO") : "";
     f.justTecnica.value = item ? item.justTecnica || "" : "";
     f.justJuridica.value = item ? item.justJuridica || "" : "";
@@ -2272,7 +2297,18 @@
   document.getElementById("btnTipoInversion").addEventListener("click", function(){ closeTipoModal(); openModal(null, "inversion"); });
   document.getElementById("btnTipoFuncionamiento").addEventListener("click", function(){ closeTipoModal(); openModal(null, "funcionamiento"); });
   els.overlay.addEventListener("click", function(e){ if (e.target === els.overlay) closeModal(); });
-  els.btnAdd.addEventListener("click", function(){ overlayTipo.classList.add("open"); });
+  els.btnAdd.addEventListener("click", function(){
+    // Solo servicios administrativos, financiera, hacienda, jurídica, control interno y control interno
+    // disciplinario pueden cargar necesidades de Funcionamiento. Control interno y control interno
+    // disciplinario SOLO manejan Funcionamiento (no tienen Plan de Desarrollo / Inversión).
+    if (SECRETARIAS_SOLO_FUNCIONAMIENTO.indexOf(currentSecretariaId) !== -1){
+      openModal(null, "funcionamiento");
+    } else if (SECRETARIAS_CON_FUNCIONAMIENTO.indexOf(currentSecretariaId) !== -1){
+      overlayTipo.classList.add("open");
+    } else {
+      openModal(null, "inversion");
+    }
+  });
 
   document.getElementById("btnSaveItem").addEventListener("click", async function(){
     clearErrors();
@@ -2391,6 +2427,8 @@
       fecha_inicio: f.inicio.value,
       fecha_fin: f.fin.value,
       honorarios: onlyDigits(f.honorarios.value) || null,
+      honorarios_2026: onlyDigits(f.honorarios2026.value) || null,
+      link_secop: f.linkSecop.value.trim() || null,
       total: totalVal,
       vigencia_futura: vigenciaVal,
       vigencia_futura_tipo: vigenciaVal === "si" ? vfTipoVal : null,
