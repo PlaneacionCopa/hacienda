@@ -212,6 +212,13 @@
   .indicador-row input{padding:.35rem .5rem;font-size:.8rem;}
   .indicador-row .ind-total{font-weight:700;text-align:right;padding-right:.3rem;}
 
+  .fuente-row{
+    display:grid;grid-template-columns:1fr 150px 34px;gap:.5rem;align-items:center;
+    font-size:.82rem;background:var(--navy-050);border:1px solid var(--line);
+    border-radius:8px;padding:.4rem .6rem;
+  }
+  .fuente-row input{padding:.35rem .5rem;font-size:.8rem;}
+
   .vf-add-row{display:grid;grid-template-columns:1fr 160px auto;gap:.5rem;align-items:end;}
   .vf-row{
     display:grid;grid-template-columns:1fr 140px 34px;gap:.5rem;align-items:center;
@@ -508,7 +515,7 @@
         </div>
         <div class="grid2" style="margin-top:.9rem;">
           <div class="field">
-            <label for="f_honorarios2026">Valor honorarios Mensuales 2026</label>
+            <label for="f_honorarios2026">Valor honorarios 2026</label>
             <input id="f_honorarios2026" inputmode="numeric" placeholder="Ej: 3.000.000">
           </div>
           <div class="field">
@@ -651,6 +658,7 @@
         <div class="field" style="margin-top:.6rem;">
           <label for="f_fuente">Agregar fuente</label>
           <select id="f_fuente"></select>
+          <div class="hint">El valor por fuente es opcional, solo de referencia (no tiene que cuadrar con ningún total).</div>
         </div>
         <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
       </div>
@@ -1117,7 +1125,7 @@
       {v:"5.3.1.13",l:"5.3.1.13 Creación y puesta en marcha de la mesa de Comunicaciones."}
     ];
 
-  var SERVICIOS = ["Asistencial","Auxiliar de oficina","Técnico","Tecnólogo","Profesional"];
+  var SERVICIOS = ["Asistencial","Auxiliar de oficina","Técnico","Tecnólogo","Profesional","Otro"];
 
   var TIPOS_CONTRATO = [
       {v:"1-prestaciondeservicios", l:"1-Prestación de servicios persona natural o jurídica"},
@@ -1132,7 +1140,8 @@
       {v:"10-leasing", l:"10-Leasing"},
       {v:"11-fiducia", l:"11-Fiducia"},
       {v:"12-consultoria", l:"12-Consultoría"},
-      {v:"13-Seguros", l:"13-Seguros"}
+      {v:"13-Seguros", l:"13-Seguros"},
+      {v:"14-otro", l:"14-Otro (Resolución, Factura)"}
     ];
 
   var MODALIDADES = [
@@ -1803,7 +1812,7 @@
         var fRes = await sb.from("priorizacion_fuentes").select("*").in("item_id", allIds);
         (fRes.data || []).forEach(function(row){
           if (!fuentesByItem[row.item_id]) fuentesByItem[row.item_id] = [];
-          fuentesByItem[row.item_id].push(row.nombre);
+          fuentesByItem[row.item_id].push({ nombre: row.nombre, valor: row.valor });
         });
         var vfRes = await sb.from("priorizacion_vigencia_futura").select("*").in("item_id", allIds);
         (vfRes.data || []).forEach(function(row){
@@ -1820,7 +1829,7 @@
         "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
-        "Honorarios mensuales","Valor honorarios Mensuales 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
+        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
         "Link SECOP contrato actual","Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
       ];
 
@@ -1831,7 +1840,9 @@
         var indicadorTxt = Array.isArray(i.indicador) ? i.indicador.map(function(x){
           return x.codigo + (x.porcentaje !== null && x.porcentaje !== undefined ? " (" + x.porcentaje + "%)" : "");
         }).join(" | ") : "";
-        var fuentesTxt = (fuentesByItem[i.id] || []).join(" | ");
+        var fuentesTxt = (fuentesByItem[i.id] || []).map(function(fu){
+          return fu.nombre + (Number(fu.valor) > 0 ? ": " + fmtCOP(Number(fu.valor)) : "");
+        }).join(" | ");
         var dias = calcDiasInclusive(i.fecha_inicio, i.fecha_fin);
         var vigenciaTxt = i.vigencia_futura === "si" ? ("Sí (" + (i.vigencia_futura_tipo === "ordinaria" ? "Ordinaria" : "Excepcional") + ")") : "No";
         var vigenciaDetalle = (vigenciaByItem[i.id] || []).map(function(v){
@@ -2069,11 +2080,39 @@
     f.total.addEventListener(evt, function(){ updateIndicadorTotalsOnly(); });
   });
 
-  // Fuentes de financiación (solo selección, sin valor)
-  function renderFuentesChosen(){ renderChosenList("fuentesList", fuentesDraft, FUENTES_OPTIONS); }
+  // Fuentes de financiación (selección + valor opcional por fuente, sin validar contra ningún total)
+  function renderFuentesChosen(){
+    var el = document.getElementById("fuentesList");
+    el.innerHTML = "";
+    fuentesDraft.forEach(function(row, idx){
+      var div = document.createElement("div");
+      div.className = "fuente-row";
+      var valVal = row.valor === "" || row.valor === null || row.valor === undefined ? "" : row.valor;
+      div.innerHTML =
+        '<span title="' + escapeHtml(labelFromOptions(FUENTES_OPTIONS, row.nombre)) + '">' + escapeHtml(row.nombre) + '</span>' +
+        '<input type="text" inputmode="numeric" placeholder="Valor (opcional)" value="' + escapeHtml(String(valVal)) + '" data-fuente-valor-idx="' + idx + '">' +
+        '<button type="button" data-remove-fuente="' + idx + '">×</button>';
+      el.appendChild(div);
+    });
+    el.querySelectorAll("[data-fuente-valor-idx]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var idx = Number(inp.getAttribute("data-fuente-valor-idx"));
+        fuentesDraft[idx].valor = onlyDigits(inp.value);
+      });
+    });
+    el.querySelectorAll("[data-remove-fuente]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        fuentesDraft.splice(Number(btn.getAttribute("data-remove-fuente")), 1);
+        renderFuentesChosen();
+      });
+    });
+  }
   f.fuente.addEventListener("change", function(){
     var val = f.fuente.value;
-    if (val && fuentesDraft.indexOf(val) === -1){ fuentesDraft.push(val); renderFuentesChosen(); }
+    if (val && !fuentesDraft.some(function(r){ return r.nombre === val; })){
+      fuentesDraft.push({ nombre: val, valor: "" });
+      renderFuentesChosen();
+    }
     f.fuente.value = "";
   });
 
@@ -2284,7 +2323,7 @@
     renderVfList(2027);
     updateVigenciaVisibility();
 
-    fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return x.nombre; }) : [];
+    fuentesDraft = item && item.fuentes ? item.fuentes.map(function(x){ return { nombre: x.nombre, valor: (x.valor === null || x.valor === undefined || Number(x.valor) === 0) ? "" : x.valor }; }) : [];
     renderFuentesChosen();
 
     fotoFile = null;
@@ -2455,7 +2494,7 @@
       justificacion_juridica: f.justJuridica.value.trim(),
       articulo_ley: f.articulo.value.trim()
     };
-    var payloadFuentes = fuentesDraft.map(function(nombre){ return { nombre: String(nombre).trim(), valor: 0 }; });
+    var payloadFuentes = fuentesDraft.map(function(r){ return { nombre: String(r.nombre).trim(), valor: Number(onlyDigits(r.valor)) || 0 }; });
 
     var res = await sb.rpc("guardar_necesidad", { p_item: payloadItem, p_fuentes: payloadFuentes, p_vigencia: payloadVigencia });
     saveBtn.disabled = false; saveBtn.textContent = "Guardar necesidad";
