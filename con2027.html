@@ -1798,11 +1798,11 @@
     }
     btn.disabled = true; btn.textContent = "Generando...";
     try{
-      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").eq("oculto", false).order("secretaria_id", { ascending: true });
+      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", false).order("secretaria_id", { ascending: true });
       if (itemsRes.error) throw itemsRes.error;
       var items = itemsRes.data || [];
 
-      var ocultosRes = await sb.from("priorizacion_items").select("*, secretarias(nombre)").eq("oculto", true).order("oculto_at", { ascending: false });
+      var ocultosRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", true).order("oculto_at", { ascending: false });
       var ocultos = ocultosRes.data || [];
 
       var allIds = items.map(function(i){ return i.id; }).concat(ocultos.map(function(i){ return i.id; }));
