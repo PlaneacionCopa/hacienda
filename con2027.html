@@ -408,9 +408,9 @@
       <span class="disabled-note" id="presCsvStatus"></span>
     </div>
 
-    <div class="pres-section-title">Ingresos vs. gastos de inversión por fuente de financiación</div>
+    <div class="pres-section-title">Ingresos vs. gastos por fuente de financiación</div>
     <div class="pres-table" id="presTablaFuentes"></div>
-    <div class="pres-hint">El "Gasto proyectado" suma los valores por fuente que cada secretaría registró en sus necesidades de <b>inversión</b>. Las necesidades de funcionamiento se muestran aparte, abajo.</div>
+    <div class="pres-hint">El "Gasto proyectado" suma, por fuente, lo que las secretarías registraron en sus necesidades de <b>inversión</b> más lo cargado en <b>funcionamiento</b> (Administración central, Concejo, Personería y Fondo local de salud).</div>
 
     <div class="pres-section-title">Funcionamiento vs. inversión (necesidades priorizadas)</div>
     <div class="pres-grid2">
@@ -2006,6 +2006,16 @@
       });
     }
 
+    // Funcionamiento por fuente (suma de las fuentes agregadas en cada entidad) se suma al gasto de la fuente
+    var funcNorm = normFunc(cfg.funcionamiento);
+    FUNC_ENTIDADES.forEach(function(en){
+      en.grupos.forEach(function(g){
+        funcNorm[en.id][g.key].forEach(function(x){
+          gastoPorFuente[x.nombre] = (gastoPorFuente[x.nombre] || 0) + x.valor;
+        });
+      });
+    });
+
     // ---- Tabla comparativa de ingresos vs. gastos de inversión por fuente ----
     var tabla = document.getElementById("presTablaFuentes");
     var nombresUsados = {};
@@ -2037,7 +2047,7 @@
     if (!fuentesIngresos.length && !filasHtml){
       tabla.innerHTML = '<p style="padding:.6rem .4rem;color:var(--ink-soft);">Todavía no se ha cargado el CSV de ingresos por fuente de financiación.</p>';
     } else {
-      var head = '<div class="pres-row head"><div>Fuente de financiación</div><div class="num">Ingreso proyectado</div><div class="num">Gasto proyectado (inversión)</div><div class="num">Diferencia</div></div>';
+      var head = '<div class="pres-row head"><div>Fuente de financiación</div><div class="num">Ingreso proyectado</div><div class="num">Gasto proyectado (inversión + funcionamiento)</div><div class="num">Diferencia</div></div>';
       var foot = '<div class="pres-row foot"><div>Total</div><div class="num">' + fmtCOP(sumIngreso) + '</div><div class="num">' + fmtCOP(sumGasto) + '</div><div class="num ' + ((sumIngreso - sumGasto) < 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(sumIngreso - sumGasto) + '</div></div>';
       tabla.innerHTML = head + filasHtml + foot;
     }
