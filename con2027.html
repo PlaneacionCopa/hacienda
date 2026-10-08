@@ -233,6 +233,41 @@
   .vf-summary.bad{display:block;background:#fdecec;color:#a3231f;border:1px solid #f3b6b4;}
   .vf-warning{margin-bottom:.7rem;padding:.6rem .75rem;border-radius:10px;font-size:.8rem;font-weight:600;background:#fff7e6;color:#92400e;border:1px solid #f5d38b;}
 
+  /* ---- Presupuesto: ingresos vs gastos por fuente ---- */
+  .pres-upload-row{
+    display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;
+    padding:1rem 1.4rem;border-bottom:1px solid var(--line);background:var(--navy-050);
+  }
+  .pres-upload-row input[type="file"]{max-width:320px;}
+  .pres-section-title{
+    padding:1rem 1.4rem .4rem;font-size:.85rem;font-weight:700;color:var(--navy-800);
+  }
+  .pres-table{padding:0 1.4rem 1rem;overflow-x:auto;}
+  .pres-row{
+    display:grid;grid-template-columns:2.4fr 1fr 1fr 1fr;gap:.6rem;align-items:center;
+    font-size:.82rem;padding:.5rem .4rem;border-bottom:1px solid var(--line);min-width:560px;
+  }
+  .pres-row.head{font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid var(--navy-800);}
+  .pres-row.foot{font-weight:800;border-top:2px solid var(--navy-800);border-bottom:none;background:var(--navy-050);border-radius:0 0 8px 8px;}
+  .pres-row .num{text-align:right;white-space:nowrap;}
+  .pres-diff-pos{color:var(--green);}
+  .pres-diff-neg{color:var(--red);}
+  .pres-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem;padding:0 1.4rem 1rem;}
+  .pres-grid2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;padding:0 1.4rem 1.2rem;}
+  @media (max-width:640px){ .pres-grid3,.pres-grid2{grid-template-columns:1fr;} }
+  .pres-box{
+    border:1px solid var(--line);border-radius:10px;padding:.7rem .85rem;background:var(--paper);
+  }
+  .pres-box.readonly{background:var(--navy-050);}
+  .pres-box label{display:block;font-size:.72rem;font-weight:600;color:var(--ink-soft);margin-bottom:.3rem;}
+  .pres-box .val{font-size:1.05rem;font-weight:800;color:var(--ink);}
+  .pres-box input{border:none;background:transparent;padding:0;font-size:1.05rem;font-weight:800;color:var(--ink);width:100%;}
+  .pres-box input:focus{outline:none;}
+  .pres-box.total .val, .pres-box.total input{color:var(--navy-800);}
+  .pres-box.diff-pos .val{color:var(--green);}
+  .pres-box.diff-neg .val{color:var(--red);}
+  .pres-hint{font-size:.72rem;color:var(--ink-soft);padding:0 1.4rem 1rem;margin-top:-.4rem;}
+
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
     width:96px;height:120px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
@@ -346,6 +381,68 @@
       </div>
     </div>
     <div id="adminOverviewTable" style="padding:0 1.4rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;"></div>
+  </div>
+
+  <!-- Panel de presupuesto: ingresos vs. gastos por fuente de financiación -->
+  <div class="card" id="presupuestoCard" style="display:none;margin-bottom:1.25rem;">
+    <div class="toolbar">
+      <h2>Presupuesto 2027 — Ingresos vs. gastos por fuente de financiación</h2>
+      <span class="disabled-note" id="presUploadNote"></span>
+    </div>
+    <div class="pres-upload-row" id="presUploadRow">
+      <div class="field" style="min-width:260px;">
+        <label for="presCsvFile">Cargar CSV de ingresos por fuente (proyección 2027)</label>
+        <input type="file" id="presCsvFile" accept=".csv,text/csv">
+      </div>
+      <button class="btn btn-primary btn-sm" id="btnPresCargarCsv" style="align-self:flex-end;">⬆ Cargar CSV</button>
+      <span class="disabled-note" id="presCsvStatus"></span>
+    </div>
+
+    <div class="pres-section-title">Ingresos vs. gastos de inversión por fuente de financiación</div>
+    <div class="pres-table" id="presTablaFuentes"></div>
+    <div class="pres-hint">El "Gasto proyectado" suma los valores por fuente que cada secretaría registró en sus necesidades de <b>inversión</b>. Las necesidades de funcionamiento se muestran aparte, abajo.</div>
+
+    <div class="pres-section-title">Funcionamiento vs. inversión (necesidades priorizadas)</div>
+    <div class="pres-grid2">
+      <div class="pres-box readonly">
+        <label>Total funcionamiento</label>
+        <div class="val" id="presTotalFuncionamiento">$0</div>
+      </div>
+      <div class="pres-box readonly">
+        <label>Total inversión</label>
+        <div class="val" id="presTotalInversion">$0</div>
+      </div>
+    </div>
+
+    <div class="pres-section-title">Resumen general del presupuesto</div>
+    <div class="pres-grid3">
+      <div class="pres-box readonly">
+        <label>Funcionamiento</label>
+        <div class="val" id="presResFuncionamiento">$0</div>
+      </div>
+      <div class="pres-box" id="presServicioDeudaBox">
+        <label for="presServicioDeuda">Servicio de la deuda</label>
+        <input type="text" inputmode="numeric" id="presServicioDeuda" placeholder="$0">
+      </div>
+      <div class="pres-box readonly">
+        <label>Inversión</label>
+        <div class="val" id="presResInversion">$0</div>
+      </div>
+    </div>
+    <div class="pres-grid3">
+      <div class="pres-box total readonly">
+        <label>Total presupuesto de gastos (funcionamiento + deuda + inversión)</label>
+        <div class="val" id="presTotalGastos">$0</div>
+      </div>
+      <div class="pres-box" id="presTotalIngresosBox">
+        <label for="presTotalIngresos">Total presupuesto de ingresos</label>
+        <input type="text" inputmode="numeric" id="presTotalIngresos" placeholder="$0">
+      </div>
+      <div class="pres-box total readonly" id="presDiferenciaBox">
+        <label>Diferencia (ingresos − gastos)</label>
+        <div class="val" id="presDiferencia">$0</div>
+      </div>
+    </div>
   </div>
 
   <!-- Vista de captura (secretaría / admin) -->
@@ -1169,7 +1266,9 @@
 
   var FORMAS_PAGO = ["Mensual","Pago único"];
 
-  var FUENTES_OPTIONS = [
+  // Lista de respaldo: se usa solo si todavía no se ha cargado el CSV de fuentes de ingresos 2027.
+  // Una vez el admin carga el CSV (panel de presupuesto), FUENTES_OPTIONS se reemplaza por esos nombres.
+  var DEFAULT_FUENTES_OPTIONS = [
     "11001-Ingresos corrientes de libre destinacion",
     "12002-Alumbrado publico",
     "12003-Multas de transito",
@@ -1215,6 +1314,7 @@
     "71401-Retiro para pago de mesadas pensionales",
     "71502-Retiros FONPET"
   ];
+  var FUENTES_OPTIONS = DEFAULT_FUENTES_OPTIONS.slice();
 
   // ---------- Utilidades ----------
   function uid(){ return "it_" + Math.random().toString(36).slice(2,9); }
@@ -1368,14 +1468,18 @@
       var secsRes = await sb.from("secretarias").select("id, nombre").order("nombre");
       secretariasCatalog = secsRes.data || [];
 
+      await loadFuentesCatalogo();
+
       showApp();
       renderUserBar();
 
       if (profile.role === "alcalde"){
         document.getElementById("captureCard").style.display = "none";
         document.getElementById("adminOverviewCard").style.display = "none";
+        document.getElementById("presupuestoCard").style.display = "none";
         document.getElementById("alcaldeWrap").style.display = "block";
         await renderAlcaldeView();
+        await renderPresupuestoPanel();
       } else {
         document.getElementById("captureCard").style.display = "block";
         document.getElementById("alcaldeWrap").style.display = "none";
@@ -1385,9 +1489,11 @@
         if (profile.role === "admin"){
           document.getElementById("adminOverviewCard").style.display = "block";
           await renderAdminOverview();
+          await renderPresupuestoPanel();
           subscribeRealtimeOverview();
         } else {
           document.getElementById("adminOverviewCard").style.display = "none";
+          document.getElementById("presupuestoCard").style.display = "none";
         }
         await loadSecretariaData();
       }
@@ -1722,8 +1828,11 @@
     await loadDashboard();
     if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
     realtimeChannel = sb.channel("alcalde-dashboard")
-      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ loadDashboard(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ loadDashboard(); renderPresupuestoPanel(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas" }, function(){ loadDashboard(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_fuentes" }, function(){ renderPresupuestoPanel(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "presupuesto_fuentes_ingresos" }, function(){ loadFuentesCatalogo(); renderPresupuestoPanel(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "presupuesto_config" }, function(){ renderPresupuestoPanel(); })
       .subscribe();
   }
 
@@ -1784,10 +1893,200 @@
   function subscribeRealtimeOverview(){
     if (realtimeChannelOverview){ sb.removeChannel(realtimeChannelOverview); realtimeChannelOverview = null; }
     realtimeChannelOverview = sb.channel("admin-overview")
-      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ renderAdminOverview(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items" }, function(){ renderAdminOverview(); renderPresupuestoPanel(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas" }, function(){ renderAdminOverview(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_fuentes" }, function(){ renderPresupuestoPanel(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "presupuesto_fuentes_ingresos" }, function(){ loadFuentesCatalogo(); renderPresupuestoPanel(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "presupuesto_config" }, function(){ renderPresupuestoPanel(); })
       .subscribe();
   }
+
+  // ---------- Presupuesto 2027: ingresos vs. gastos por fuente de financiación ----------
+  function parseColNumber(s){
+    if (s === undefined || s === null) return 0;
+    s = String(s).trim().replace(/^"|"$/g, "").trim();
+    if (!s) return 0;
+    s = s.replace(/\./g, "").replace(",", ".");
+    var n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function parseFuentesIngresosCSV(text){
+    var lines = text.split(/\r?\n/).filter(function(l){ return l.trim().length > 0; });
+    if (lines.length < 3) throw new Error("El archivo no tiene el formato esperado (se esperaban al menos 3 líneas: total, encabezado y fuentes).");
+    var firstCols = lines[0].split(";");
+    var total = parseColNumber(firstCols[1]);
+    var rows = [];
+    for (var i = 2; i < lines.length; i++){
+      var cols = lines[i].split(";");
+      if (cols.length < 2) continue;
+      var nombre = cols[0].trim().replace(/^"|"$/g, "").trim();
+      if (!nombre) continue;
+      var valor = parseColNumber(cols[1]);
+      var nRubrosNum = parseInt(String(cols[2] || "").trim(), 10);
+      var pct = parseColNumber(cols[3]);
+      rows.push({ nombre_fuente: nombre, valor: valor, n_rubros: isNaN(nRubrosNum) ? null : nRubrosNum, pct: pct });
+    }
+    if (!rows.length) throw new Error("No se encontraron filas de fuentes de financiación en el archivo.");
+    return { total: total, rows: rows };
+  }
+
+  function refillFuentesSelects(){
+    var prevFuente = f.fuente ? f.fuente.value : "";
+    fillSelect(f.fuente, FUENTES_OPTIONS);
+    fillSelect(f.vf2026Fuente, FUENTES_OPTIONS);
+    fillSelect(f.vf2027Fuente, FUENTES_OPTIONS);
+    if (f.fuente) f.fuente.value = prevFuente;
+  }
+
+  async function loadFuentesCatalogo(){
+    try{
+      var res = await sb.from("presupuesto_fuentes_ingresos").select("nombre_fuente").order("nombre_fuente");
+      if (!res.error && res.data && res.data.length){
+        FUENTES_OPTIONS = res.data.map(function(r){ return r.nombre_fuente; });
+      } else {
+        FUENTES_OPTIONS = DEFAULT_FUENTES_OPTIONS.slice();
+      }
+    }catch(e){
+      FUENTES_OPTIONS = DEFAULT_FUENTES_OPTIONS.slice();
+    }
+    refillFuentesSelects();
+  }
+
+  async function renderPresupuestoPanel(){
+    if (!profile || !(profile.role === "admin" || profile.role === "alcalde")) return;
+    var card = document.getElementById("presupuestoCard");
+    if (!card) return;
+    card.style.display = "block";
+
+    var esAdmin = profile.role === "admin";
+    document.getElementById("presUploadRow").style.display = esAdmin ? "flex" : "none";
+    document.getElementById("presUploadNote").textContent = esAdmin ? "" : "Solo el administrador puede actualizar el CSV de ingresos y los campos manuales.";
+    document.getElementById("presServicioDeuda").disabled = !esAdmin;
+    document.getElementById("presTotalIngresos").disabled = !esAdmin;
+
+    var fuentesRes = await sb.from("presupuesto_fuentes_ingresos").select("*").order("nombre_fuente");
+    var fuentesIngresos = fuentesRes.data || [];
+
+    var cfgRes = await sb.from("presupuesto_config").select("*").eq("id", "singleton").maybeSingle();
+    var cfg = cfgRes.data || { total_presupuesto_ingresos: null, servicio_deuda: 0 };
+
+    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total").eq("oculto", false);
+    var items = itemsRes.data || [];
+    var idsInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; }).map(function(i){ return i.id; });
+    var totalFuncionamiento = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento"; })
+      .reduce(function(s,i){ return s + Number(i.total||0); }, 0);
+    var totalInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; })
+      .reduce(function(s,i){ return s + Number(i.total||0); }, 0);
+
+    var gastoPorFuente = {};
+    if (idsInversion.length){
+      var fiRes = await sb.from("priorizacion_fuentes").select("nombre, valor").in("item_id", idsInversion);
+      (fiRes.data || []).forEach(function(r){
+        gastoPorFuente[r.nombre] = (gastoPorFuente[r.nombre] || 0) + Number(r.valor || 0);
+      });
+    }
+
+    // ---- Tabla comparativa de ingresos vs. gastos de inversión por fuente ----
+    var tabla = document.getElementById("presTablaFuentes");
+    var nombresUsados = {};
+    var filasHtml = "";
+    var sumIngreso = 0, sumGasto = 0;
+    fuentesIngresos.forEach(function(fu){
+      var ingreso = Number(fu.valor || 0);
+      var gasto = gastoPorFuente[fu.nombre_fuente] || 0;
+      nombresUsados[fu.nombre_fuente] = true;
+      var dif = ingreso - gasto;
+      sumIngreso += ingreso; sumGasto += gasto;
+      filasHtml += '<div class="pres-row"><div>' + escapeHtml(fu.nombre_fuente) + '</div>' +
+        '<div class="num">' + fmtCOP(ingreso) + '</div>' +
+        '<div class="num">' + fmtCOP(gasto) + '</div>' +
+        '<div class="num ' + (dif < 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(dif) + '</div></div>';
+    });
+    // Fuentes que las secretarías usaron en sus necesidades pero que no aparecen en el CSV de ingresos cargado
+    Object.keys(gastoPorFuente).forEach(function(nombre){
+      if (nombresUsados[nombre]) return;
+      var gasto = gastoPorFuente[nombre];
+      if (!gasto) return;
+      sumGasto += gasto;
+      filasHtml += '<div class="pres-row"><div>' + escapeHtml(nombre) + ' <span class="tag" style="margin-left:.3rem;">sin ingreso cargado</span></div>' +
+        '<div class="num">' + fmtCOP(0) + '</div>' +
+        '<div class="num">' + fmtCOP(gasto) + '</div>' +
+        '<div class="num pres-diff-neg">' + fmtCOP(-gasto) + '</div></div>';
+    });
+
+    if (!fuentesIngresos.length && !filasHtml){
+      tabla.innerHTML = '<p style="padding:.6rem .4rem;color:var(--ink-soft);">Todavía no se ha cargado el CSV de ingresos por fuente de financiación.</p>';
+    } else {
+      var head = '<div class="pres-row head"><div>Fuente de financiación</div><div class="num">Ingreso proyectado</div><div class="num">Gasto proyectado (inversión)</div><div class="num">Diferencia</div></div>';
+      var foot = '<div class="pres-row foot"><div>Total</div><div class="num">' + fmtCOP(sumIngreso) + '</div><div class="num">' + fmtCOP(sumGasto) + '</div><div class="num ' + ((sumIngreso - sumGasto) < 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(sumIngreso - sumGasto) + '</div></div>';
+      tabla.innerHTML = head + filasHtml + foot;
+    }
+
+    document.getElementById("presTotalFuncionamiento").textContent = fmtCOP(totalFuncionamiento);
+    document.getElementById("presTotalInversion").textContent = fmtCOP(totalInversion);
+    document.getElementById("presResFuncionamiento").textContent = fmtCOP(totalFuncionamiento);
+    document.getElementById("presResInversion").textContent = fmtCOP(totalInversion);
+
+    var servicioDeuda = Number(cfg.servicio_deuda || 0);
+    var totalIngresosCfg = (cfg.total_presupuesto_ingresos === null || cfg.total_presupuesto_ingresos === undefined) ? null : Number(cfg.total_presupuesto_ingresos);
+
+    var inpDeuda = document.getElementById("presServicioDeuda");
+    if (document.activeElement !== inpDeuda) inpDeuda.value = servicioDeuda ? servicioDeuda.toLocaleString("es-CO") : "";
+    var inpIngresos = document.getElementById("presTotalIngresos");
+    if (document.activeElement !== inpIngresos) inpIngresos.value = (totalIngresosCfg !== null) ? totalIngresosCfg.toLocaleString("es-CO") : "";
+
+    var totalGastos = totalFuncionamiento + servicioDeuda + totalInversion;
+    document.getElementById("presTotalGastos").textContent = fmtCOP(totalGastos);
+
+    var totalIngresosVal = totalIngresosCfg !== null ? totalIngresosCfg : 0;
+    var diferencia = totalIngresosVal - totalGastos;
+    var difBox = document.getElementById("presDiferenciaBox");
+    difBox.classList.remove("diff-pos", "diff-neg");
+    difBox.classList.add(diferencia < 0 ? "diff-neg" : "diff-pos");
+    document.getElementById("presDiferencia").textContent = fmtCOP(diferencia);
+  }
+
+  document.getElementById("btnPresCargarCsv").addEventListener("click", async function(){
+    var fileInput = document.getElementById("presCsvFile");
+    var statusEl = document.getElementById("presCsvStatus");
+    if (!fileInput.files || !fileInput.files[0]){ alert("Seleccione primero el archivo CSV."); return; }
+    var btn = this;
+    btn.disabled = true; statusEl.textContent = "Leyendo archivo...";
+    try{
+      var text = await fileInput.files[0].text();
+      var parsed = parseFuentesIngresosCSV(text);
+      statusEl.textContent = "Guardando " + parsed.rows.length + " fuentes...";
+      var res = await sb.rpc("admin_set_fuentes_ingresos", { p_rows: parsed.rows, p_total: parsed.total });
+      if (res.error) throw res.error;
+      statusEl.textContent = "✔ Cargado: " + parsed.rows.length + " fuentes · total ingresos " + fmtCOP(parsed.total);
+      fileInput.value = "";
+      await loadFuentesCatalogo();
+      await renderPresupuestoPanel();
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = "";
+      alert("No se pudo cargar el CSV: " + (err.message || err));
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("presServicioDeuda").addEventListener("change", async function(){
+    if (!profile || profile.role !== "admin") return;
+    var valor = Number(onlyDigits(this.value)) || 0;
+    var res = await sb.rpc("admin_set_servicio_deuda", { p_valor: valor });
+    if (res.error){ alert("No se pudo guardar el servicio de la deuda: " + res.error.message); return; }
+    await renderPresupuestoPanel();
+  });
+
+  document.getElementById("presTotalIngresos").addEventListener("change", async function(){
+    if (!profile || profile.role !== "admin") return;
+    var valor = Number(onlyDigits(this.value)) || 0;
+    var res = await sb.rpc("admin_set_total_ingresos", { p_valor: valor });
+    if (res.error){ alert("No se pudo guardar el total de ingresos: " + res.error.message); return; }
+    await renderPresupuestoPanel();
+  });
 
   // ---------- Exportar todo a Excel (solo admin) ----------
   async function exportarExcel(){
