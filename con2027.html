@@ -424,15 +424,7 @@
       </div>
     </div>
 
-    <div class="pres-section-title">Funcionamiento (presupuesto por entidad)</div>
-    <div class="pres-upload-row" id="presFuncUploadRow">
-      <div class="field" style="min-width:260px;">
-        <label for="presFuncCsvFile">Cargar CSV de funcionamiento</label>
-        <input type="file" id="presFuncCsvFile" accept=".csv,text/csv">
-      </div>
-      <button class="btn btn-primary btn-sm" id="btnPresFuncCargarCsv" style="align-self:flex-end;">⬆ Cargar CSV</button>
-      <span class="disabled-note" id="presFuncCsvStatus"></span>
-    </div>
+    <div class="pres-section-title">Funcionamiento (presupuesto por entidad y fuente)</div>
     <div id="presFuncBlocks" style="padding:1rem 1.4rem 0;display:flex;flex-direction:column;gap:.8rem;"></div>
     <div class="pres-grid2" style="padding-top:.8rem;">
       <div class="pres-box total readonly">
@@ -1990,7 +1982,6 @@
     document.getElementById("presUploadRow").style.display = esAdmin ? "flex" : "none";
     document.getElementById("presUploadNote").textContent = esAdmin ? "" : "Solo el administrador puede actualizar el CSV de ingresos y los campos manuales.";
     document.getElementById("presServicioDeuda").disabled = !esAdmin;
-    document.getElementById("presFuncUploadRow").style.display = esAdmin ? "flex" : "none";
     document.getElementById("presTotalIngresos").disabled = !esAdmin;
 
     var fuentesRes = await sb.from("presupuesto_fuentes_ingresos").select("*").order("nombre_fuente");
@@ -2076,56 +2067,40 @@
     document.getElementById("presDiferencia").textContent = fmtCOP(diferencia);
   }
 
-  // ---------- Funcionamiento por entidad (CSV + fuentes manuales) ----------
+  // ---------- Funcionamiento por entidad (fuentes manuales; el total es la suma de las fuentes) ----------
   var FUNC_ENTIDADES = [
-    { id: "adm_central", nombre: "Administración central" },
-    { id: "concejo", nombre: "Concejo" },
-    { id: "personeria", nombre: "Personería" },
-    { id: "fondo_salud", nombre: "Fondo local de salud" }
+    { id: "adm_central", nombre: "Administración central", grupos: [{ key: "honorarios", label: "Honorarios" }, { key: "otros", label: "Otros gastos" }] },
+    { id: "concejo", nombre: "Concejo", grupos: [{ key: "fuentes", label: "" }] },
+    { id: "personeria", nombre: "Personería", grupos: [{ key: "fuentes", label: "" }] },
+    { id: "fondo_salud", nombre: "Fondo local de salud", grupos: [{ key: "fuentes", label: "" }] }
   ];
   var funcState = {};
 
+  function normFuentes(arr){
+    return Array.isArray(arr) ? arr.map(function(x){ return { nombre: x.nombre, valor: Number(x.valor) || 0 }; }) : [];
+  }
   function normFunc(data){
     var out = {};
     FUNC_ENTIDADES.forEach(function(en){
       var e = (data && data[en.id]) || {};
-      out[en.id] = {
-        csv: Number(e.csv) || 0,
-        honorarios: Number(e.honorarios) || 0,
-        otros: Number(e.otros) || 0,
-        fuentes: Array.isArray(e.fuentes) ? e.fuentes.map(function(x){ return { nombre: x.nombre, valor: Number(x.valor) || 0 }; }) : []
-      };
+      out[en.id] = {};
+      en.grupos.forEach(function(g){ out[en.id][g.key] = normFuentes(e[g.key + "_fuentes"] || (g.key === "fuentes" ? e.fuentes : null)); });
     });
     return out;
   }
-  function funcEntityTotal(id, e){ return id === "adm_central" ? (e.honorarios + e.otros) : e.csv; }
-
-  function plainText(s){ return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
-
-  function parseFuncionamientoCSV(text){
-    var found = {};
-    text.split(/\r?\n/).forEach(function(line){
-      if (!line.trim()) return;
-      var sep = line.indexOf(";") !== -1 ? ";" : (line.indexOf("\t") !== -1 ? "\t" : ",");
-      var cells = line.split(sep).map(function(c){ return c.trim().replace(/^"|"$/g, "").trim(); });
-      var name = plainText(cells[0]);
-      var id = null;
-      if (name.indexOf("administracion central") !== -1) id = "adm_central";
-      else if (name.indexOf("concejo") !== -1) id = "concejo";
-      else if (name.indexOf("personeria") !== -1) id = "personeria";
-      else if (name.indexOf("fondo local") !== -1 || name.indexOf("salud") !== -1) id = "fondo_salud";
-      if (!id || found[id] !== undefined) return;
-      for (var i = 1; i < cells.length; i++){
-        var v = parseColNumber(cells[i]);
-        if (v > 0){ found[id] = v; break; }
-      }
+  // Se guarda como { entidad: { <grupo>_fuentes: [...] } }
+  function funcToSave(){
+    var out = {};
+    FUNC_ENTIDADES.forEach(function(en){
+      out[en.id] = {};
+      en.grupos.forEach(function(g){ out[en.id][g.key + "_fuentes"] = funcState[en.id][g.key]; });
     });
-    if (!Object.keys(found).length) throw new Error("No encontré filas de Administración central, Concejo, Personería ni Fondo local de salud con un valor.");
-    return found;
+    return out;
   }
+  function sumFuentes(arr){ return arr.reduce(function(s,x){ return s + x.valor; }, 0); }
 
   async function saveFuncionamiento(){
-    var res = await sb.rpc("admin_set_funcionamiento", { p_data: funcState });
+    var res = await sb.rpc("admin_set_funcionamiento", { p_data: funcToSave() });
     if (res.error){ alert("No se pudo guardar funcionamiento: " + res.error.message); return false; }
     return true;
   }
@@ -2133,36 +2108,30 @@
   function renderFuncionamiento(data, esAdmin){
     funcState = normFunc(data);
     var wrap = document.getElementById("presFuncBlocks");
-    var dis = esAdmin ? "" : " disabled";
     var totalGeneral = 0;
     var html = FUNC_ENTIDADES.map(function(en){
-      var e = funcState[en.id];
-      var total = funcEntityTotal(en.id, e);
-      totalGeneral += total;
-      var sumF = e.fuentes.reduce(function(s,x){ return s + x.valor; }, 0);
-      var ok = Math.round(sumF) === Math.round(total);
-      var h = '<div class="func-block" data-ent="' + en.id + '"><div class="func-head"><h4>' + en.nombre + '</h4>' +
-        '<span class="func-total">' + fmtCOP(total) + '</span></div>';
-      if (en.id === "adm_central"){
-        h += '<div class="func-fields"><div class="field"><label>Honorarios</label><input type="text" inputmode="numeric" data-fld="honorarios" value="' + (e.honorarios ? e.honorarios.toLocaleString("es-CO") : "") + '"' + dis + '></div>' +
-          '<div class="field"><label>Otros gastos</label><input type="text" inputmode="numeric" data-fld="otros" value="' + (e.otros ? e.otros.toLocaleString("es-CO") : "") + '"' + dis + '></div></div>';
-        if (e.csv) h += '<div class="hint">Valor del CSV: ' + fmtCOP(e.csv) + ' · diferencia con honorarios + otros: ' + fmtCOP(e.csv - total) + '</div>';
-      } else if (e.csv === 0){
-        h += '<div class="hint">Sin valor cargado desde el CSV.</div>';
-      }
-      h += e.fuentes.map(function(x, idx){
-        return '<div class="func-row"><span>' + escapeHtml(x.nombre) + '</span><span class="num">' + fmtCOP(x.valor) + '</span>' +
-          (esAdmin ? '<button type="button" data-del="' + idx + '">×</button>' : '<span></span>') + '</div>';
+      var totalEnt = 0;
+      var grupos = en.grupos.map(function(g){
+        var arr = funcState[en.id][g.key];
+        var sub = sumFuentes(arr);
+        totalEnt += sub;
+        var h = '<div data-grp="' + g.key + '" style="margin-top:.4rem;">';
+        if (g.label) h += '<div class="func-head" style="margin-bottom:.1rem;"><span class="section-label">' + g.label + '</span><span class="func-total">' + fmtCOP(sub) + '</span></div>';
+        h += arr.map(function(x, idx){
+          return '<div class="func-row"><span>' + escapeHtml(x.nombre) + '</span><span class="num">' + fmtCOP(x.valor) + '</span>' +
+            (esAdmin ? '<button type="button" data-del="' + idx + '">×</button>' : '<span></span>') + '</div>';
+        }).join("");
+        if (esAdmin){
+          h += '<div class="func-add"><div class="field"><label>Fuente de financiación</label><select data-fsel>' +
+            '<option value="">Seleccione...</option>' + FUENTES_OPTIONS.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join("") +
+            '</select></div><div class="field"><label>Valor</label><input type="text" inputmode="numeric" data-fval placeholder="$0"></div>' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-add>Agregar</button></div>';
+        }
+        return h + '</div>';
       }).join("");
-      if (esAdmin){
-        h += '<div class="func-add"><div class="field"><label>Fuente de financiación</label><select data-fsel>' +
-          '<option value="">Seleccione...</option>' + FUENTES_OPTIONS.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join("") +
-          '</select></div><div class="field"><label>Valor</label><input type="text" inputmode="numeric" data-fval placeholder="$0"></div>' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-add>Agregar</button></div>';
-      }
-      h += '<div class="fuentes-total ' + (ok ? "fuentes-ok" : "fuentes-bad") + '"><span>Suma de fuentes: ' + fmtCOP(sumF) + '</span><span>' +
-        (ok ? "✔ Cuadra con el total" : (sumF > total ? "Sobran " + fmtCOP(sumF - total) : "Faltan " + fmtCOP(total - sumF))) + '</span></div></div>';
-      return h;
+      totalGeneral += totalEnt;
+      return '<div class="func-block" data-ent="' + en.id + '"><div class="func-head"><h4>' + en.nombre + '</h4>' +
+        '<span class="func-total">Total: ' + fmtCOP(totalEnt) + '</span></div>' + grupos + '</div>';
     }).join("");
     wrap.innerHTML = html;
     document.getElementById("presFuncTotal").textContent = fmtCOP(totalGeneral);
@@ -2170,49 +2139,27 @@
     if (esAdmin){
       wrap.querySelectorAll(".func-block").forEach(function(blk){
         var id = blk.getAttribute("data-ent");
-        blk.querySelectorAll("[data-fld]").forEach(function(inp){
-          inp.addEventListener("change", async function(){
-            funcState[id][inp.getAttribute("data-fld")] = Number(onlyDigits(inp.value)) || 0;
+        blk.querySelectorAll("[data-grp]").forEach(function(grp){
+          var key = grp.getAttribute("data-grp");
+          grp.querySelectorAll("[data-del]").forEach(function(btn){
+            btn.addEventListener("click", async function(){
+              funcState[id][key].splice(Number(btn.getAttribute("data-del")), 1);
+              if (await saveFuncionamiento()) await renderPresupuestoPanel();
+            });
+          });
+          grp.querySelector("[data-add]").addEventListener("click", async function(){
+            var nombre = grp.querySelector("[data-fsel]").value;
+            var valor = Number(onlyDigits(grp.querySelector("[data-fval]").value)) || 0;
+            if (!nombre || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0."); return; }
+            var ex = funcState[id][key].find(function(x){ return x.nombre === nombre; });
+            if (ex) ex.valor += valor; else funcState[id][key].push({ nombre: nombre, valor: valor });
             if (await saveFuncionamiento()) await renderPresupuestoPanel();
           });
-        });
-        blk.querySelectorAll("[data-del]").forEach(function(btn){
-          btn.addEventListener("click", async function(){
-            funcState[id].fuentes.splice(Number(btn.getAttribute("data-del")), 1);
-            if (await saveFuncionamiento()) await renderPresupuestoPanel();
-          });
-        });
-        var addBtn = blk.querySelector("[data-add]");
-        if (addBtn) addBtn.addEventListener("click", async function(){
-          var nombre = blk.querySelector("[data-fsel]").value;
-          var valor = Number(onlyDigits(blk.querySelector("[data-fval]").value)) || 0;
-          if (!nombre || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0."); return; }
-          var ex = funcState[id].fuentes.find(function(x){ return x.nombre === nombre; });
-          if (ex) ex.valor += valor; else funcState[id].fuentes.push({ nombre: nombre, valor: valor });
-          if (await saveFuncionamiento()) await renderPresupuestoPanel();
         });
       });
     }
     return totalGeneral;
   }
-
-  document.getElementById("btnPresFuncCargarCsv").addEventListener("click", async function(){
-    var fileInput = document.getElementById("presFuncCsvFile");
-    var statusEl = document.getElementById("presFuncCsvStatus");
-    if (!fileInput.files || !fileInput.files[0]){ alert("Seleccione primero el archivo CSV de funcionamiento."); return; }
-    var btn = this; btn.disabled = true; statusEl.textContent = "Leyendo archivo...";
-    try{
-      var found = parseFuncionamientoCSV(await fileInput.files[0].text());
-      FUNC_ENTIDADES.forEach(function(en){ if (found[en.id] !== undefined) funcState[en.id].csv = found[en.id]; });
-      if (!(await saveFuncionamiento())) throw new Error("No se guardó");
-      statusEl.textContent = "✔ Leído: " + FUNC_ENTIDADES.map(function(en){ return en.nombre + " " + (found[en.id] !== undefined ? fmtCOP(found[en.id]) : "(no encontrado)"); }).join(" · ");
-      fileInput.value = "";
-      await renderPresupuestoPanel();
-    }catch(err){
-      console.error(err); statusEl.textContent = "";
-      alert("No se pudo cargar el CSV de funcionamiento: " + (err.message || err));
-    }finally{ btn.disabled = false; }
-  });
 
   document.getElementById("btnPresCargarCsv").addEventListener("click", async function(){
     var fileInput = document.getElementById("presCsvFile");
