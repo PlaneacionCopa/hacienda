@@ -1714,7 +1714,6 @@
         var hideBtn = document.createElement("button");
         hideBtn.className = "btn btn-danger-text btn-sm";
         hideBtn.textContent = enOcultos ? "Reactivar" : "X";
-        hideBtn.title = enOcultos ? "Reactivar" : "Ocultar";
         hideBtn.onclick = async function(){
           var msg = enOcultos ? "¿Reactivar esta necesidad y devolverla a su secretaría de origen?" : "¿Ocultar esta necesidad? Dejará de verla la secretaría y no contará en los totales hasta que la reactive desde \"O\".";
           if (!confirm(msg)) return;
