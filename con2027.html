@@ -300,7 +300,7 @@
   .vf-toolbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem;}
   .vf-toolbar select{flex:1;min-width:240px;}
   .vf2-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;}
-  .vf2-table{display:grid;align-items:stretch;min-width:100%;width:max-content;}
+  .vf2-table{display:grid;align-items:stretch;width:100%;}
   .vf2-row{display:contents;}
   .vf2-row > *{padding:.35rem .45rem;min-width:0;display:flex;align-items:center;}
   .vf2-head > *, .vf2-tot, .vf2-foot > *{justify-content:flex-end;}
@@ -675,7 +675,6 @@
             <div class="field"><label>Fecha de la solicitud</label><input type="date" id="vfFecha"></div>
           </div>
           <div class="field"><label class="req">Código del proyecto (BPIN)</label><select id="vfCodigo"></select><div class="error-text" id="err_vf_codigo"></div></div>
-          <div class="field"><label class="req">Nombre del proyecto</label><input type="text" id="vfNombre" placeholder="Escriba el nombre del proyecto"><div class="error-text" id="err_vf_nombre"></div></div>
           <div class="field"><label class="req">Descripción</label><textarea id="vfDescripcion" rows="3" placeholder="Describa brevemente el objeto de la vigencia futura"></textarea><div class="error-text" id="err_vf_desc"></div></div>
         </div>
       </div>
@@ -701,20 +700,20 @@
       </div>
 
       <div class="vf-card">
-        <div class="vf-card-title"><span class="n">4</span>Cuadro 2 — Componentes a contratar</div>
+        <div class="vf-card-title"><span class="n">4</span>Cuadro 2 — Tipo de contratación</div>
         <div id="vfCuadro2"></div>
-        <button type="button" class="btn btn-ghost btn-sm vf-addrow" id="vfBtnComp">+ Agregar componente</button>
+        <button type="button" class="btn btn-ghost btn-sm vf-addrow" id="vfBtnComp">+ Agregar tipo de contratación</button>
       </div>
 
       <div class="vf-card">
         <div class="vf-card-title"><span class="n">5</span>Cuadro 3 — Plan de pagos (giros)</div>
-        <div class="vf-card-sub">Distribuya por mes lo que se pagará cada año. El total debe ser igual al total a contratar del Cuadro 2.</div>
+        <div class="vf-card-sub">Distribuya por mes lo que se pagará cada año (2026 y siguientes). El total debe ser igual al total a contratar del Cuadro 2.</div>
         <div id="vfCuadro3"></div>
         <div class="vf-summary" id="vfGirosCheck"></div>
       </div>
 
       <div class="vf-card">
-        <div class="vf-card-title"><span class="n">6</span>Documento PDF</div>
+        <div class="vf-card-title"><span class="n">6</span>Justificación técnica (PDF)</div>
         <div class="vf-pdf">
           <input type="file" id="vfPdfFile" accept="application/pdf,.pdf">
           <div id="vfPdfInfo"></div>
@@ -2346,6 +2345,19 @@
 
   function vfHoy(){ var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
+  var VF_ANIO_ACTUAL = 2026;
+  var VF_TIPOS = [
+    ["1-prestaciondeservicios","1-Prestación de servicios persona natural o jurídica"],["2-suministros","2-Suministro"],["3-compraventa","3-Compraventa"],
+    ["4-arrendamiento","4-Arrendamiento"],["5-obra","5-Obra"],["6-comodato","6-Comodato"],["7-iteradministrativo","7-Interadministrativo"],
+    ["8-concesion","8-Concesión"],["9-mandato","9-Mandato"],["10-leasing","10-Leasing"],["11-fiducia","11-Fiducia"],
+    ["12-consultoria","12-Consultoría"],["13-Seguros","13-Seguros"]
+  ];
+  function vfTipoLabel(v){ var t = VF_TIPOS.filter(function(x){ return x[0] === v; })[0]; return t ? t[1] : ""; }
+  function vfGirosAnios(d){ return [VF_ANIO_ACTUAL].concat(d.anios); }
+  function vfNombreDe(codigo){
+    var o = BPIN_OPTIONS.filter(function(x){ return x.v === codigo; })[0];
+    return o ? o.l.replace(codigo, "").trim() : "";
+  }
   var VF_FUENTES = ["RECURSOS PROPIOS", "TRANSFERENCIAS DE LA NACIÓN", "RECURSOS CRÉDITO MUNICIPIO"];
   function vfFuentesBase(prev){
     return VF_FUENTES.map(function(n){
@@ -2356,13 +2368,13 @@
   function vfNewDraft(){
     var d = {
       id: null, fecha: vfHoy(), codigo: "", nombre: "", descripcion: "", tipo: "ordinaria", importancia: "no", fechaConsejo: "", solicitud: "no",
-      anios: [2026, 2027], fuentes: vfFuentesBase(), componentes: [{ nombre: "", valor: 0, tipo: "directa" }], giros: {}, pdfPath: null, pdfNombre: null, pdfQuitar: false
+      anios: [2027], fuentes: vfFuentesBase(), componentes: [{ valor: 0, tipo: "" }], giros: {}, pdfPath: null, pdfNombre: null, pdfQuitar: false
     };
     vfEnsureGiros(d);
     return d;
   }
   function vfEnsureGiros(d){
-    d.anios.forEach(function(a){
+    vfGirosAnios(d).forEach(function(a){
       if (!Array.isArray(d.giros[a]) || d.giros[a].length !== 12) d.giros[a] = [0,0,0,0,0,0,0,0,0,0,0,0];
     });
   }
@@ -2370,12 +2382,12 @@
     var dat = r.datos || {};
     var d = {
       id: r.id, fecha: dat.fecha || (r.created_at ? r.created_at.slice(0, 10) : vfHoy()),
-      codigo: r.codigo_proyecto || "", nombre: r.nombre_proyecto || "", descripcion: r.descripcion || "",
+      codigo: r.codigo_proyecto || "", nombre: r.nombre_proyecto || vfNombreDe(r.codigo_proyecto), descripcion: r.descripcion || "",
       tipo: r.tipo || "ordinaria", importancia: r.importancia_estrategica || "no",
       fechaConsejo: r.fecha_consejo_gobierno || "", solicitud: r.solicitud_con_presupuesto || "no",
-      anios: Array.isArray(dat.anios) && dat.anios.length ? dat.anios.map(Number) : [2026, 2027],
+      anios: (Array.isArray(dat.anios) ? dat.anios.map(Number).filter(function(a){ return a > VF_ANIO_ACTUAL; }) : []).length ? dat.anios.map(Number).filter(function(a){ return a > VF_ANIO_ACTUAL; }) : [2027],
       fuentes: vfFuentesBase(Array.isArray(dat.fuentes) ? dat.fuentes : []),
-      componentes: Array.isArray(dat.componentes) && dat.componentes.length ? dat.componentes.map(function(c){ return { nombre: c.nombre || "", valor: Number(c.valor) || 0, tipo: c.tipo || "directa" }; }) : [{ nombre: "", valor: 0, tipo: "directa" }],
+      componentes: Array.isArray(dat.componentes) && dat.componentes.length ? dat.componentes.map(function(c){ return { valor: Number(c.valor) || 0, tipo: vfTipoLabel(c.tipo) ? c.tipo : "" }; }) : [{ valor: 0, tipo: "" }],
       giros: dat.giros || {}, pdfPath: r.pdf_path || null, pdfNombre: r.pdf_nombre || null, pdfQuitar: false
     };
     vfEnsureGiros(d);
@@ -2394,7 +2406,7 @@
       });
     });
     var contratar = d.componentes.reduce(function(s, c){ return s + (Number(c.valor) || 0); }, 0);
-    d.anios.forEach(function(a){ (d.giros[a] || []).forEach(function(v){ giros += Number(v) || 0; }); });
+    vfGirosAnios(d).forEach(function(a){ (d.giros[a] || []).forEach(function(v){ giros += Number(v) || 0; }); });
     return { actual: actual, vfTotal: vfTotal, porAnio: porAnio, contratar: contratar, giros: giros };
   }
 
@@ -2478,7 +2490,7 @@
     var hdr1 = 16;
     function headerFuentes(rr){
       head(rr, 1, 1, "FUENTE DE FINANCIACIÓN-PROCESO CONTRATACIÓN");
-      head(rr, 2, 2, "APROPIACIÓN VIGENCIA ACTUAL");
+      head(rr, 2, 2, "APROPIACIÓN VIGENCIA ACTUAL (" + VF_ANIO_ACTUAL + ")");
       d.anios.forEach(function(a, i){ head(rr, 3 + i, 3 + i, a); });
       head(rr, colTot, colTot, "TOTAL VF");
       ws.getRow(rr).height = 32;
@@ -2551,22 +2563,18 @@
     // ---- CUADRO 2 ----
     var r2 = totC + 2; section(r2, "CUADRO 2. PROGRAMACIÓN DE CONTRATACIÓN");
     var h2 = r2 + 1;
-    head(h2, 1, 1, "Nº"); head(h2, 2, 8, "COMPONENTE"); head(h2, 9, 10, "VALOR A CONTRATAR (corrientes ó constantes)");
-    head(h2, 11, 12, "DIRECTA"); head(h2, 13, 14, "LICITACIÓN O CONCURSO");
+    head(h2, 1, 1, "Nº"); head(h2, 2, 8, "TIPO DE CONTRATACIÓN"); head(h2, 9, 10, "VALOR A CONTRATAR (corrientes ó constantes)");
     ws.getRow(h2).height = 32;
-    var comps = d.componentes.length ? d.componentes : [{ nombre: "", valor: 0, tipo: "directa" }];
+    var comps = d.componentes.length ? d.componentes : [{ valor: 0, tipo: "" }];
     comps.forEach(function(cp, i3){
       var rr3 = h2 + 1 + i3;
       put(rr3, 1, 1, i3 + 1, { h: "center" });
-      put(rr3, 2, 8, cp.nombre || "", {});
+      put(rr3, 2, 8, vfTipoLabel(cp.tipo), {});
       put(rr3, 9, 10, fnum(cp.valor), { fmt: MONEY });
-      put(rr3, 11, 12, cp.tipo === "directa" ? "X" : "", { h: "center", bold: true });
-      put(rr3, 13, 14, cp.tipo === "licitacion" ? "X" : "", { h: "center", bold: true });
     });
     var f2 = h2 + 1, l2 = h2 + comps.length, t2 = l2 + 1;
     put(t2, 1, 8, "TOTAL", { bold: true, fill: LIGHT, h: "right" });
     put(t2, 9, 10, { formula: "SUM(I" + f2 + ":I" + l2 + ")", result: T.contratar }, { fmt: MONEY, bold: true, fill: LIGHT });
-    put(t2, 11, 14, "", { fill: LIGHT });
 
     // ---- CUADRO 3 (plan de pagos) ----
     var r3 = t2 + 2; section(r3, "CUADRO 3. PROGRAMACIÓN DE GIROS (plan de pagos)");
@@ -2575,7 +2583,8 @@
     head(h3, 1, 1, "AÑO");
     VF_MESES.forEach(function(m, i4){ head(h3, 2 + i4, 2 + i4, m); });
     head(h3, 14, 14, "TOTAL");
-    d.anios.forEach(function(a, i5){
+    var gA = vfGirosAnios(d);
+    gA.forEach(function(a, i5){
       var rg = h3 + 1 + i5;
       put(rg, 1, 1, a, { h: "center", bold: true });
       var sumA = 0;
@@ -2586,7 +2595,7 @@
       }
       put(rg, 14, 14, { formula: "SUM(B" + rg + ":M" + rg + ")", result: sumA }, { fmt: MONEY, bold: true });
     });
-    var fg = h3 + 1, lg = h3 + nY, tg = lg + 1;
+    var fg = h3 + 1, lg = h3 + gA.length, tg = lg + 1;
     put(tg, 1, 12, "TOTAL GIROS", { bold: true, fill: LIGHT, h: "right" });
     put(tg, 13, 13, "", { fill: LIGHT });
     put(tg, 14, 14, { formula: "SUM(N" + fg + ":N" + lg + ")", result: T.giros }, { fmt: MONEY, bold: true, fill: LIGHT });
@@ -2614,7 +2623,7 @@
   function vfRenderCuadro1(){
     var d = vfDraft, nY = d.anios.length;
     var cols = "minmax(200px,1.6fr) repeat(" + (nY + 1) + ",minmax(104px,1fr)) minmax(110px,1fr)";
-    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Fuente de financiación</div><div>Apropiación vigencia actual</div>' +
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Fuente de financiación</div><div>Apropiación vigencia actual (' + VF_ANIO_ACTUAL + ')</div>' +
       d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '<div>Total VF</div></div>';
     d.fuentes.forEach(function(fu, i){
       h += '<div class="vf2-row"><div class="vf2-name">' + escapeHtml(fu.nombre) + '</div>' +
@@ -2629,23 +2638,22 @@
       var p = inp.getAttribute("data-c1").split("|"), i = Number(p[0]), key = p[1];
       vfMoneyInput(inp, function(n){ if (key === "actual") d.fuentes[i].actual = n; else d.fuentes[i].valores[key] = n; });
     });
-    document.getElementById("vfBtnAnioMenos").style.display = d.anios.length > 2 ? "inline-flex" : "none";
+    document.getElementById("vfBtnAnioMenos").style.display = d.anios.length > 1 ? "inline-flex" : "none";
     document.getElementById("vfBtnAnioMas").style.display = d.anios.length < VF_MAX_ANIOS ? "inline-flex" : "none";
   }
 
   // ----- Cuadro 2 -----
   function vfRenderCuadro2(){
     var d = vfDraft;
-    var cols = "44px minmax(220px,3fr) minmax(150px,1.2fr) minmax(190px,1.2fr) 34px";
-    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Nº</div><div style="justify-content:flex-start">Componente</div><div>Valor a contratar</div><div style="justify-content:flex-start">Tipo de contratación</div><div></div></div>';
+    var cols = "44px minmax(260px,3fr) minmax(170px,1.2fr) 34px";
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Nº</div><div style="justify-content:flex-start">Tipo de contratación</div><div>Valor a contratar</div><div></div></div>';
     d.componentes.forEach(function(c, i){
       h += '<div class="vf2-row"><div class="vf2-name">' + (i + 1) + '</div>' +
-        '<div><input data-c2="' + i + '|nombre" value="' + escapeHtml(c.nombre) + '" placeholder="Componente"></div>' +
+        '<div><select data-c2="' + i + '|tipo"><option value="">Seleccionar...</option>' + VF_TIPOS.map(function(t){ return '<option value="' + t[0] + '"' + (c.tipo === t[0] ? " selected" : "") + '>' + escapeHtml(t[1]) + '</option>'; }).join("") + '</select></div>' +
         '<div><input inputmode="numeric" data-c2="' + i + '|valor" value="' + vfMoneyStr(c.valor) + '" placeholder="$0"></div>' +
-        '<div><select data-c2="' + i + '|tipo"><option value="directa"' + (c.tipo === "directa" ? " selected" : "") + '>Directa</option><option value="licitacion"' + (c.tipo === "licitacion" ? " selected" : "") + '>Licitación o concurso</option></select></div>' +
         '<div>' + (d.componentes.length > 1 ? '<button type="button" class="vf2-x" data-c2del="' + i + '">×</button>' : '') + '</div></div>';
     });
-    h += '<div class="vf2-row vf2-foot"><div></div><div style="justify-content:flex-start">TOTAL A CONTRATAR</div><div id="vfTotContratar">$0</div><div></div><div></div></div></div>';
+    h += '<div class="vf2-row vf2-foot"><div></div><div style="justify-content:flex-start">TOTAL A CONTRATAR</div><div id="vfTotContratar">$0</div><div></div></div></div>';
     document.getElementById("vfCuadro2").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro2 [data-c2]").forEach(function(el){
       var p = el.getAttribute("data-c2").split("|"), i = Number(p[0]), key = p[1];
@@ -2661,13 +2669,13 @@
   function vfRenderCuadro3(){
     var d = vfDraft;
     vfEnsureGiros(d);
-    var cols = "90px repeat(" + d.anios.length + ",minmax(130px,1fr))";
-    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Mes</div>' + d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '</div>';
+    var cols = "90px repeat(" + vfGirosAnios(d).length + ",minmax(130px,1fr))";
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Mes</div>' + vfGirosAnios(d).map(function(a){ return '<div>' + a + '</div>'; }).join("") + '</div>';
     VF_MESES.forEach(function(m, mi){
       h += '<div class="vf2-row"><div class="vf2-name">' + m + '</div>' +
-        d.anios.map(function(a){ return '<div><input inputmode="numeric" data-c3="' + a + '|' + mi + '" value="' + vfMoneyStr(d.giros[a][mi]) + '" placeholder="$0"></div>'; }).join("") + '</div>';
+        vfGirosAnios(d).map(function(a){ return '<div><input inputmode="numeric" data-c3="' + a + '|' + mi + '" value="' + vfMoneyStr(d.giros[a][mi]) + '" placeholder="$0"></div>'; }).join("") + '</div>';
     });
-    h += '<div class="vf2-row vf2-foot"><div>Total año</div>' + d.anios.map(function(a){ return '<div id="vfGiroTot' + a + '">$0</div>'; }).join("") + '</div>';
+    h += '<div class="vf2-row vf2-foot"><div>Total año</div>' + vfGirosAnios(d).map(function(a){ return '<div id="vfGiroTot' + a + '">$0</div>'; }).join("") + '</div>';
     h += '<div class="vf2-row vf2-foot"><div>TOTAL GIROS</div><div id="vfTotGiros" style="grid-column:2/-1;">$0</div></div></div>';
     document.getElementById("vfCuadro3").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro3 [data-c3]").forEach(function(inp){
@@ -2691,7 +2699,7 @@
     pc.textContent = "Apropiación vigencia actual / total vigencia futura: " + (pct * 100).toFixed(1).replace(".", ",") + "%  (mínimo 15%)" +
       (T.vfTotal && pct >= 0.15 ? " ✔" : "");
     document.getElementById("vfTotContratar").textContent = fmtCOP(T.contratar);
-    d.anios.forEach(function(a){
+    vfGirosAnios(d).forEach(function(a){
       var s = (d.giros[a] || []).reduce(function(acc, v){ return acc + (Number(v) || 0); }, 0);
       var el = document.getElementById("vfGiroTot" + a); if (el) el.textContent = fmtCOP(s);
     });
@@ -2743,14 +2751,13 @@
       var op = document.createElement("option"); op.value = d.codigo; op.textContent = d.codigo; document.getElementById("vfCodigo").appendChild(op);
       document.getElementById("vfCodigo").value = d.codigo;
     }
-    document.getElementById("vfNombre").value = d.nombre;
     document.getElementById("vfDescripcion").value = d.descripcion;
     document.querySelector('input[name="vf_tipo"][value="' + d.tipo + '"]').checked = true;
     document.querySelector('input[name="vf_imp"][value="' + d.importancia + '"]').checked = true;
     document.querySelector('input[name="vf_sol"][value="' + d.solicitud + '"]').checked = true;
     document.getElementById("vfFechaConsejo").value = d.fechaConsejo;
     document.getElementById("vfPdfFile").value = "";
-    ["err_vf_codigo","err_vf_nombre","err_vf_desc","err_vf_global"].forEach(function(id){ document.getElementById(id).textContent = ""; });
+    ["err_vf_codigo","err_vf_desc","err_vf_global"].forEach(function(id){ document.getElementById(id).textContent = ""; });
     vfUpdateVisibility(); vfRenderCuadro1(); vfRenderCuadro2(); vfRenderCuadro3(); vfRenderPdfInfo(); vfUpdateTotals();
     document.getElementById("overlayVf").classList.add("open");
   }
@@ -2759,21 +2766,21 @@
   async function vfGuardar(){
     var d = vfDraft;
     d.codigo = document.getElementById("vfCodigo").value;
-    d.nombre = document.getElementById("vfNombre").value.trim();
+    d.nombre = vfNombreDe(d.codigo) || d.nombre;
     d.descripcion = document.getElementById("vfDescripcion").value.trim();
     d.tipo = document.querySelector('input[name="vf_tipo"]:checked').value;
     d.importancia = document.querySelector('input[name="vf_imp"]:checked').value;
     d.solicitud = document.querySelector('input[name="vf_sol"]:checked').value;
     d.fechaConsejo = document.getElementById("vfFechaConsejo").value;
     var ok = true;
-    ["err_vf_codigo","err_vf_nombre","err_vf_desc","err_vf_global"].forEach(function(id){ document.getElementById(id).textContent = ""; });
+    ["err_vf_codigo","err_vf_desc","err_vf_global"].forEach(function(id){ document.getElementById(id).textContent = ""; });
     if (!d.codigo){ document.getElementById("err_vf_codigo").textContent = "Seleccione el código del proyecto."; ok = false; }
-    if (!d.nombre){ document.getElementById("err_vf_nombre").textContent = "Escriba el nombre del proyecto."; ok = false; }
     if (!d.descripcion){ document.getElementById("err_vf_desc").textContent = "Escriba la descripción del objeto de gasto."; ok = false; }
     var T = vfTotals(d);
     var msgs = [];
     if (!(vfTotals(d).vfTotal > 0)) msgs.push("Ingrese los valores de vigencias futuras en el Cuadro 1.");
     if (T.contratar <= 0) msgs.push("Ingrese el valor a contratar en el Cuadro 2.");
+    else if (d.componentes.some(function(c){ return Number(c.valor) > 0 && !c.tipo; })) msgs.push("Seleccione el tipo de contratación en cada fila del Cuadro 2.");
     else if (T.giros !== T.contratar) msgs.push("El plan de pagos (Cuadro 3) debe sumar exactamente el total a contratar del Cuadro 2.");
     if (d.importancia === "si" && !d.fechaConsejo) msgs.push("Indique la fecha del Consejo de Gobierno.");
     if (msgs.length){ document.getElementById("err_vf_global").innerHTML = msgs.map(escapeHtml).join("<br>"); ok = false; }
@@ -2844,14 +2851,14 @@
     document.getElementById("vfBtnAbrir").textContent = "📄 Vigencias futuras" + (vfSolicitudes.length ? " (" + vfSolicitudes.length + ")" : "");
     el.innerHTML = vfSolicitudes.map(function(r, i){
       var d = vfFromRow(r), T = vfTotals(d);
-      return '<div class="item-card"><div class="item-top"><div><div class="item-objeto">' + escapeHtml(d.codigo) + ' — ' + escapeHtml(d.nombre) + '</div>' +
+      return '<div class="item-card"><div class="item-top"><div><div class="item-objeto">' + escapeHtml(d.codigo) + (d.nombre ? ' — ' + escapeHtml(d.nombre) : "") + '</div>' +
         '<div class="item-tags"><span class="tag">' + (d.tipo === "ordinaria" ? "Ordinaria" : "Excepcional") + '</span>' +
         '<span class="tag">' + d.anios.join(", ") + '</span>' +
-        (r.pdf_path ? '<span class="tag">📄 PDF adjunto</span>' : '<span class="tag" style="background:var(--amber-bg);color:var(--amber);">Sin PDF</span>') + '</div></div>' +
+        (r.pdf_path ? '<span class="tag">📄 Justificación técnica</span>' : '<span class="tag" style="background:var(--amber-bg);color:var(--amber);">Sin PDF</span>') + '</div></div>' +
         '<div class="total" style="font-weight:800;white-space:nowrap;">' + fmtCOP(T.vfTotal) + '</div></div>' +
         '<div class="item-bottom"><span>Total vigencias futuras solicitadas</span><div class="item-actions">' +
         '<button type="button" class="btn btn-ghost btn-sm" data-vf="xlsx|' + i + '">⬇ Excel</button>' +
-        (r.pdf_path ? '<button type="button" class="btn btn-ghost btn-sm" data-vf="pdf|' + i + '">⬇ PDF</button>' : '') +
+        (r.pdf_path ? '<button type="button" class="btn btn-ghost btn-sm" data-vf="pdf|' + i + '">⬇ Justificación</button>' : '') +
         '<button type="button" class="btn btn-primary btn-sm" data-vf="edit|' + i + '">Editar</button>' +
         '<button type="button" class="btn btn-danger-text btn-sm" data-vf="del|' + i + '">×</button></div></div></div>';
     }).join("");
@@ -2895,7 +2902,7 @@
       vfRenderCuadro1(); vfRenderCuadro3(); vfUpdateTotals();
     });
     document.getElementById("vfBtnAnioMenos").addEventListener("click", function(){
-      var d = vfDraft; if (d.anios.length <= 2) return;
+      var d = vfDraft; if (d.anios.length <= 1) return;
       var ultimo = d.anios[d.anios.length - 1];
       var tiene = d.fuentes.some(function(f){ return Number(f.valores[ultimo]) > 0; }) || (d.giros[ultimo] || []).some(function(v){ return Number(v) > 0; });
       if (tiene && !confirm("El año " + ultimo + " tiene valores cargados. ¿Quitarlo de todos modos?")) return;
@@ -2904,7 +2911,7 @@
       vfRenderCuadro1(); vfRenderCuadro3(); vfUpdateTotals();
     });
     document.getElementById("vfBtnComp").addEventListener("click", function(){
-      vfDraft.componentes.push({ nombre: "", valor: 0, tipo: "directa" }); vfRenderCuadro2(); vfUpdateTotals();
+      vfDraft.componentes.push({ valor: 0, tipo: "" }); vfRenderCuadro2(); vfUpdateTotals();
     });
     document.getElementById("vfPdfFile").addEventListener("change", function(){
       var file = this.files && this.files[0];
