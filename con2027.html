@@ -279,16 +279,43 @@
   @media (max-width:640px){ .func-fields,.func-add{grid-template-columns:1fr;} }
   .pres-hint{font-size:.72rem;color:var(--ink-soft);padding:0 1.4rem 1rem;margin-top:-.4rem;}
 
-  .vf2-scroll{overflow-x:auto;}
-  .vf2-grid{display:grid;gap:.3rem;align-items:center;margin-bottom:.3rem;min-width:max-content;font-size:.78rem;}
-  .vf2-head{font-weight:700;color:var(--ink-soft);font-size:.7rem;}
-  .vf2-foot{font-weight:800;border-top:1px solid var(--line,#ddd);padding-top:.35rem;}
-  .vf2-name{font-weight:600;word-break:break-word;}
-  .vf2-tot{font-weight:700;text-align:right;white-space:nowrap;}
-  .vf2-grid input{width:100%;min-width:0;padding:.3rem .4rem;border:1px solid var(--line,#ccc);border-radius:6px;font:inherit;}
-  .vf2-x{border:none;background:none;color:#a3231f;font-size:1.1rem;cursor:pointer;}
-  .vf-sec{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--line,#e5e5e5);}
-  .vf-sec h4{margin:0 0 .5rem;font-size:.9rem;}
+  /* ===== Vigencias futuras ===== */
+  #overlayVf .modal{max-width:1040px;}
+  #overlayVf .modal-body{max-height:74vh;gap:1rem;padding:1.2rem 1.4rem 1.4rem;background:#f7f8fb;}
+  .vf-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;}
+  .vf-card-title{display:flex;align-items:center;gap:.55rem;margin:0 0 .85rem;font-size:.92rem;font-weight:700;color:var(--navy-900);}
+  .vf-card-title .n{width:22px;height:22px;border-radius:50%;background:var(--navy-800);color:#fff;font-size:.72rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .vf-card-sub{font-size:.76rem;color:var(--ink-soft);margin:-.5rem 0 .8rem;}
+  .vf-row2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;}
+  .vf-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;}
+  @media (max-width:720px){ .vf-row2,.vf-row3{grid-template-columns:1fr;} }
+  .vf-stack{display:flex;flex-direction:column;gap:.85rem;}
+  .vf-seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;}
+  .vf-seg label{margin:0;cursor:pointer;}
+  .vf-seg input{position:absolute;opacity:0;pointer-events:none;}
+  .vf-seg span{display:block;padding:.45rem 1rem;font-size:.82rem;font-weight:600;color:var(--ink-soft);border-right:1px solid var(--line);}
+  .vf-seg label:last-child span{border-right:none;}
+  .vf-seg input:checked + span{background:var(--navy-800);color:#fff;}
+  .vf-seg input:focus-visible + span{outline:2px solid var(--focus);outline-offset:-2px;}
+  .vf-toolbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.75rem;}
+  .vf-toolbar select{flex:1;min-width:240px;}
+  .vf2-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;}
+  .vf2-table{display:grid;align-items:stretch;min-width:100%;width:max-content;}
+  .vf2-row{display:contents;}
+  .vf2-row > *{padding:.35rem .45rem;min-width:0;display:flex;align-items:center;}
+  .vf2-head > *, .vf2-tot, .vf2-foot > *{justify-content:flex-end;}
+  .vf2-head > *:first-child, .vf2-foot > *:first-child{justify-content:flex-start;}
+  .vf2-head > *{background:var(--navy-050);color:var(--navy-800);font-size:.7rem;font-weight:700;text-align:right;padding:.55rem .55rem;}
+    .vf2-row:not(.vf2-head):not(.vf2-foot) > *{border-top:1px solid var(--line);}
+  .vf2-table input,.vf2-table select{width:100%;padding:.42rem .5rem;font-size:.82rem;}
+  .vf2-table input[inputmode]{text-align:right;}
+  .vf2-name{font-weight:600;font-size:.82rem;word-break:break-word;}
+  .vf2-tot{font-weight:700;text-align:right;white-space:nowrap;font-size:.82rem;}
+  .vf2-foot > *{background:var(--navy-050);font-weight:800;font-size:.82rem;border-top:2px solid var(--navy-800);text-align:right;}
+    .vf2-x{border:none;background:none;color:var(--red);font-size:1.15rem;cursor:pointer;line-height:1;}
+  .vf-addrow{margin-top:.7rem;}
+  .vf-pdf{display:flex;flex-direction:column;gap:.5rem;}
+  .vf-pdf input[type=file]{padding:.55rem;background:#fff;border:1px dashed var(--navy-700);}
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
     width:96px;height:120px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
@@ -633,59 +660,73 @@
 
 <!-- Modal vigencias futuras -->
 <div class="overlay" id="overlayVf">
-  <div class="modal" style="max-width:1000px;">
+  <div class="modal">
     <div class="modal-head">
       <h3 id="vfModalTitle">Solicitud de autorización de vigencias futuras</h3>
       <button class="modal-close" id="vfBtnClose">×</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.7rem;">
-      <div class="field"><label>Dependencia</label><input type="text" id="vfDependencia" readonly></div>
-      <div class="field"><label>Fecha</label><input type="date" id="vfFecha"></div>
-    </div>
-    <div class="vf-sec">
-      <div class="field"><label>Código del proyecto (BPIN)</label><select id="vfCodigo"></select><div class="hint" id="err_vf_codigo" style="color:#a3231f;"></div></div>
-      <div class="field" style="margin-top:.6rem;"><label>Nombre del proyecto</label><input type="text" id="vfNombre"><div class="hint" id="err_vf_nombre" style="color:#a3231f;"></div></div>
-      <div class="field" style="margin-top:.6rem;"><label>Descripción</label><textarea id="vfDescripcion" rows="3"></textarea><div class="hint" id="err_vf_desc" style="color:#a3231f;"></div></div>
-    </div>
-    <div class="vf-sec">
-      <h4>Características</h4>
-      <div class="field"><label>Tipo de vigencia futura</label>
-        <div class="radio-group"><label><input type="radio" name="vf_tipo" value="ordinaria"> Ordinaria</label><label><input type="radio" name="vf_tipo" value="excepcional"> Excepcional</label></div></div>
-      <div class="field" style="margin-top:.6rem;"><label>Declarada de importancia estratégica</label>
-        <div class="radio-group"><label><input type="radio" name="vf_imp" value="si"> Sí</label><label><input type="radio" name="vf_imp" value="no"> No</label></div></div>
-      <div class="field" id="vfFechaConsejoWrap" style="margin-top:.6rem;display:none;"><label>Fecha del Consejo de Gobierno</label><input type="date" id="vfFechaConsejo"></div>
-      <div class="field" style="margin-top:.6rem;"><label>Solicitud con el proyecto de presupuesto</label>
-        <div class="radio-group"><label><input type="radio" name="vf_sol" value="si"> Sí</label><label><input type="radio" name="vf_sol" value="no"> No</label></div></div>
-    </div>
-    <div class="vf-sec">
-      <h4>Cuadro 1 — Vigencias futuras por fuente de financiación</h4>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem;">
-        <select id="vfFuenteSel" style="min-width:260px;"></select>
-        <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMas">+ Año</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMenos">− Año</button>
+    <div class="modal-body">
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">1</span>Datos del proyecto</div>
+        <div class="vf-stack">
+          <div class="vf-row2">
+            <div class="field"><label>Dependencia</label><input type="text" id="vfDependencia" readonly></div>
+            <div class="field"><label>Fecha de la solicitud</label><input type="date" id="vfFecha"></div>
+          </div>
+          <div class="field"><label class="req">Código del proyecto (BPIN)</label><select id="vfCodigo"></select><div class="error-text" id="err_vf_codigo"></div></div>
+          <div class="field"><label class="req">Nombre del proyecto</label><input type="text" id="vfNombre" placeholder="Escriba el nombre del proyecto"><div class="error-text" id="err_vf_nombre"></div></div>
+          <div class="field"><label class="req">Descripción</label><textarea id="vfDescripcion" rows="3" placeholder="Describa brevemente el objeto de la vigencia futura"></textarea><div class="error-text" id="err_vf_desc"></div></div>
+        </div>
       </div>
-      <div id="vfCuadro1"></div>
-      <div class="vf-summary" id="vfPctCheck"></div>
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">2</span>Características</div>
+        <div class="vf-row3">
+          <div class="field"><label>Tipo de vigencia futura</label><div class="vf-seg"><label><input type="radio" name="vf_tipo" value="ordinaria"><span>Ordinaria</span></label><label><input type="radio" name="vf_tipo" value="excepcional"><span>Excepcional</span></label></div></div>
+          <div class="field"><label>Declarada de importancia estratégica</label><div class="vf-seg"><label><input type="radio" name="vf_imp" value="si"><span>Sí</span></label><label><input type="radio" name="vf_imp" value="no"><span>No</span></label></div></div>
+          <div class="field"><label>Solicitud con el proyecto de presupuesto</label><div class="vf-seg"><label><input type="radio" name="vf_sol" value="si"><span>Sí</span></label><label><input type="radio" name="vf_sol" value="no"><span>No</span></label></div></div>
+        </div>
+        <div class="field" id="vfFechaConsejoWrap" style="margin-top:.85rem;display:none;max-width:280px;"><label>Fecha del Consejo de Gobierno</label><input type="date" id="vfFechaConsejo"></div>
+      </div>
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">3</span>Cuadro 1 — Vigencias futuras por fuente de financiación</div>
+        <div class="vf-toolbar">
+          <select id="vfFuenteSel"></select>
+          <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMas">+ Año</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMenos">− Año</button>
+        </div>
+        <div id="vfCuadro1"></div>
+        <div class="vf-summary" id="vfPctCheck"></div>
+      </div>
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">4</span>Cuadro 2 — Componentes a contratar</div>
+        <div id="vfCuadro2"></div>
+        <button type="button" class="btn btn-ghost btn-sm vf-addrow" id="vfBtnComp">+ Agregar componente</button>
+      </div>
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">5</span>Cuadro 3 — Plan de pagos (giros)</div>
+        <div class="vf-card-sub">Distribuya por mes lo que se pagará cada año. El total debe ser igual al total a contratar del Cuadro 2.</div>
+        <div id="vfCuadro3"></div>
+        <div class="vf-summary" id="vfGirosCheck"></div>
+      </div>
+
+      <div class="vf-card">
+        <div class="vf-card-title"><span class="n">6</span>Documento PDF</div>
+        <div class="vf-pdf">
+          <input type="file" id="vfPdfFile" accept="application/pdf,.pdf">
+          <div id="vfPdfInfo"></div>
+        </div>
+      </div>
+
+      <div class="error-text" id="err_vf_global"></div>
     </div>
-    <div class="vf-sec">
-      <h4>Cuadro 2 — Componentes a contratar</h4>
-      <div id="vfCuadro2"></div>
-      <button type="button" class="btn btn-ghost btn-sm" id="vfBtnComp">+ Componente</button>
-    </div>
-    <div class="vf-sec">
-      <h4>Cuadro 3 — Plan de pagos (giros)</h4>
-      <div id="vfCuadro3"></div>
-      <div class="vf-summary" id="vfGirosCheck"></div>
-    </div>
-    <div class="vf-sec">
-      <h4>Documento PDF</h4>
-      <input type="file" id="vfPdfFile" accept="application/pdf,.pdf">
-      <div id="vfPdfInfo" style="margin-top:.4rem;"></div>
-    </div>
-    <div class="hint" id="err_vf_global" style="color:#a3231f;margin-top:.6rem;"></div>
-    <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.8rem;">
+    <div class="modal-foot">
       <button type="button" class="btn btn-ghost" id="vfBtnCancelar">Cancelar</button>
-      <button type="button" class="btn btn-primary" id="vfBtnGuardar">Guardar</button>
+      <button type="button" class="btn btn-primary" id="vfBtnGuardar">Guardar solicitud</button>
     </div>
   </div>
 </div>
@@ -2567,18 +2608,18 @@
   // ----- Cuadro 1 -----
   function vfRenderCuadro1(){
     var d = vfDraft, nY = d.anios.length;
-    var cols = "minmax(210px,1.8fr) repeat(" + (nY + 1) + ",minmax(112px,1fr)) minmax(120px,1fr) 30px";
-    var h = '<div class="vf2-grid vf2-head" style="grid-template-columns:' + cols + ';"><div>Fuente de financiación</div><div>Apropiación vigencia actual</div>' +
+    var cols = "minmax(220px,2fr) repeat(" + (nY + 1) + ",minmax(120px,1fr)) minmax(120px,1fr) 34px";
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Fuente de financiación</div><div>Apropiación vigencia actual</div>' +
       d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '<div>Total VF</div><div></div></div>';
     d.fuentes.forEach(function(fu, i){
-      h += '<div class="vf2-grid" style="grid-template-columns:' + cols + ';"><div class="vf2-name">' + escapeHtml(fu.nombre) + '</div>' +
+      h += '<div class="vf2-row"><div class="vf2-name">' + escapeHtml(fu.nombre) + '</div>' +
         '<div><input inputmode="numeric" data-c1="' + i + '|actual" value="' + vfMoneyStr(fu.actual) + '" placeholder="$0"></div>' +
         d.anios.map(function(a){ return '<div><input inputmode="numeric" data-c1="' + i + '|' + a + '" value="' + vfMoneyStr(fu.valores[a]) + '" placeholder="$0"></div>'; }).join("") +
         '<div class="vf2-tot" id="vfRowTot' + i + '">$0</div><div><button type="button" class="vf2-x" data-c1del="' + i + '">×</button></div></div>';
     });
-    if (!d.fuentes.length) h += '<div class="hint" style="padding:.5rem .2rem;">Agregue al menos una fuente de financiación.</div>';
-    h += '<div class="vf2-grid vf2-foot" style="grid-template-columns:' + cols + ';"><div>TOTAL</div><div id="vfTotActual">$0</div>' +
-      d.anios.map(function(a){ return '<div id="vfTotY' + a + '">$0</div>'; }).join("") + '<div id="vfTotVF">$0</div><div></div></div>';
+    if (!d.fuentes.length) h += '<div style="grid-column:1/-1;border-top:1px solid var(--line);padding:.9rem;color:var(--ink-soft);font-size:.82rem;text-align:center;">Agregue al menos una fuente de financiación con el selector de arriba.</div>';
+    h += '<div class="vf2-row vf2-foot"><div>TOTAL</div><div id="vfTotActual">$0</div>' +
+      d.anios.map(function(a){ return '<div id="vfTotY' + a + '">$0</div>'; }).join("") + '<div id="vfTotVF">$0</div><div></div></div></div>';
     document.getElementById("vfCuadro1").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro1 [data-c1]").forEach(function(inp){
       var p = inp.getAttribute("data-c1").split("|"), i = Number(p[0]), key = p[1];
@@ -2594,16 +2635,16 @@
   // ----- Cuadro 2 -----
   function vfRenderCuadro2(){
     var d = vfDraft;
-    var cols = "34px minmax(200px,2fr) minmax(130px,1fr) minmax(150px,1fr) 30px";
-    var h = '<div class="vf2-grid vf2-head" style="grid-template-columns:' + cols + ';"><div>Nº</div><div>Componente</div><div>Valor a contratar</div><div>Tipo de contratación</div><div></div></div>';
+    var cols = "44px minmax(220px,3fr) minmax(150px,1.2fr) minmax(190px,1.2fr) 34px";
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Nº</div><div style="justify-content:flex-start">Componente</div><div>Valor a contratar</div><div style="justify-content:flex-start">Tipo de contratación</div><div></div></div>';
     d.componentes.forEach(function(c, i){
-      h += '<div class="vf2-grid" style="grid-template-columns:' + cols + ';"><div>' + (i + 1) + '</div>' +
+      h += '<div class="vf2-row"><div class="vf2-name">' + (i + 1) + '</div>' +
         '<div><input data-c2="' + i + '|nombre" value="' + escapeHtml(c.nombre) + '" placeholder="Componente"></div>' +
         '<div><input inputmode="numeric" data-c2="' + i + '|valor" value="' + vfMoneyStr(c.valor) + '" placeholder="$0"></div>' +
         '<div><select data-c2="' + i + '|tipo"><option value="directa"' + (c.tipo === "directa" ? " selected" : "") + '>Directa</option><option value="licitacion"' + (c.tipo === "licitacion" ? " selected" : "") + '>Licitación o concurso</option></select></div>' +
         '<div>' + (d.componentes.length > 1 ? '<button type="button" class="vf2-x" data-c2del="' + i + '">×</button>' : '') + '</div></div>';
     });
-    h += '<div class="vf2-grid vf2-foot" style="grid-template-columns:' + cols + ';"><div></div><div>TOTAL A CONTRATAR</div><div id="vfTotContratar">$0</div><div></div><div></div></div>';
+    h += '<div class="vf2-row vf2-foot"><div></div><div style="justify-content:flex-start">TOTAL A CONTRATAR</div><div id="vfTotContratar">$0</div><div></div><div></div></div></div>';
     document.getElementById("vfCuadro2").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro2 [data-c2]").forEach(function(el){
       var p = el.getAttribute("data-c2").split("|"), i = Number(p[0]), key = p[1];
@@ -2619,14 +2660,14 @@
   function vfRenderCuadro3(){
     var d = vfDraft;
     vfEnsureGiros(d);
-    var cols = "56px repeat(12,minmax(92px,1fr)) minmax(118px,1fr)";
-    var h = '<div class="vf2-grid vf2-head" style="grid-template-columns:' + cols + ';"><div>Año</div>' + VF_MESES.map(function(m){ return '<div>' + m + '</div>'; }).join("") + '<div>Total</div></div>';
-    d.anios.forEach(function(a){
-      h += '<div class="vf2-grid" style="grid-template-columns:' + cols + ';"><div class="vf2-name"><b>' + a + '</b></div>' +
-        VF_MESES.map(function(m, mi){ return '<div><input inputmode="numeric" data-c3="' + a + '|' + mi + '" value="' + vfMoneyStr(d.giros[a][mi]) + '" placeholder="$0"></div>'; }).join("") +
-        '<div class="vf2-tot" id="vfGiroTot' + a + '">$0</div></div>';
+    var cols = "90px repeat(" + d.anios.length + ",minmax(130px,1fr))";
+    var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Mes</div>' + d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '</div>';
+    VF_MESES.forEach(function(m, mi){
+      h += '<div class="vf2-row"><div class="vf2-name">' + m + '</div>' +
+        d.anios.map(function(a){ return '<div><input inputmode="numeric" data-c3="' + a + '|' + mi + '" value="' + vfMoneyStr(d.giros[a][mi]) + '" placeholder="$0"></div>'; }).join("") + '</div>';
     });
-    h += '<div class="vf2-grid vf2-foot" style="grid-template-columns:' + cols + ';"><div></div><div style="grid-column:span 12;text-align:right;">TOTAL GIROS</div><div id="vfTotGiros">$0</div></div>';
+    h += '<div class="vf2-row vf2-foot"><div>Total año</div>' + d.anios.map(function(a){ return '<div id="vfGiroTot' + a + '">$0</div>'; }).join("") + '</div>';
+    h += '<div class="vf2-row vf2-foot"><div>TOTAL GIROS</div><div id="vfTotGiros" style="grid-column:2/-1;">$0</div></div></div>';
     document.getElementById("vfCuadro3").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro3 [data-c3]").forEach(function(inp){
       var p = inp.getAttribute("data-c3").split("|"), a = p[0], mi = Number(p[1]);
