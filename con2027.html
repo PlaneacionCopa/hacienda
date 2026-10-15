@@ -490,6 +490,10 @@
         <label>Estado de la lista</label>
         <span id="statusPill" class="status-pill status-borrador">● Borrador</span>
       </div>
+      <div class="field" id="vfCard" style="display:none;">
+        <label>&nbsp;</label>
+        <button type="button" class="btn btn-primary btn-sm" id="vfBtnAbrir">📄 Vigencias futuras</button>
+      </div>
       <div class="field" style="margin-left:auto;">
         <label>&nbsp;</label>
         <span class="disabled-note" id="secretariaNote"></span>
@@ -530,16 +534,6 @@
     </div>
 
     <div id="itemsList" class="items"></div>
-  </div>
-
-  <!-- Vigencias futuras (formulario E-PI-F-007) -->
-  <div class="card" id="vfCard" style="display:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;">
-      <h3 style="margin:0;">Vigencias futuras (formulario E-PI-F-007)</h3>
-      <button type="button" class="btn btn-primary btn-sm" id="vfBtnNueva">+ Nueva solicitud</button>
-    </div>
-    <div id="vfEmpty" class="hint" style="margin-top:.6rem;">Aún no hay solicitudes de vigencias futuras.</div>
-    <div id="vfLista" class="items" style="margin-top:.6rem;"></div>
   </div>
 
   <!-- Vista del alcalde (solo lectura, con gráficas) -->
@@ -621,6 +615,19 @@
       <button class="modal-close" id="btnCloseFotoLightbox">×</button>
     </div>
     <img id="fotoLightboxImg" src="" alt="Foto del contratista en grande">
+  </div>
+</div>
+
+<!-- Lista de vigencias futuras -->
+<div class="overlay" id="overlayVfLista">
+  <div class="modal" style="max-width:820px;">
+    <div class="modal-head">
+      <h3>Vigencias futuras (formulario E-PI-F-007)</h3>
+      <button class="modal-close" id="vfBtnListaClose">×</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.6rem;"><button type="button" class="btn btn-primary btn-sm" id="vfBtnNueva">+ Nueva solicitud</button></div>
+    <div id="vfEmpty" class="hint">Aún no hay solicitudes de vigencias futuras.</div>
+    <div id="vfLista" class="items" style="margin-top:.6rem;"></div>
   </div>
 </div>
 
@@ -2793,6 +2800,7 @@
   function vfRenderLista(){
     var el = document.getElementById("vfLista");
     document.getElementById("vfEmpty").style.display = vfSolicitudes.length ? "none" : "block";
+    document.getElementById("vfBtnAbrir").textContent = "📄 Vigencias futuras" + (vfSolicitudes.length ? " (" + vfSolicitudes.length + ")" : "");
     el.innerHTML = vfSolicitudes.map(function(r, i){
       var d = vfFromRow(r), T = vfTotals(d);
       return '<div class="item-card"><div class="item-top"><div><div class="item-objeto">' + escapeHtml(d.codigo) + ' — ' + escapeHtml(d.nombre) + '</div>' +
@@ -2835,6 +2843,8 @@
     fillSelect(document.getElementById("vfCodigo"), BPIN_OPTIONS, "Seleccionar proyecto...");
     fillSelect(document.getElementById("vfFuenteSel"), FUENTES_OPTIONS, "Agregar fuente de financiación...");
     document.getElementById("vfBtnNueva").addEventListener("click", function(){ vfOpenModal(null); });
+    document.getElementById("vfBtnAbrir").addEventListener("click", function(){ document.getElementById("overlayVfLista").classList.add("open"); });
+    document.getElementById("vfBtnListaClose").addEventListener("click", function(){ document.getElementById("overlayVfLista").classList.remove("open"); });
     document.getElementById("vfBtnClose").addEventListener("click", vfCloseModal);
     document.getElementById("vfBtnCancelar").addEventListener("click", vfCloseModal);
     document.getElementById("vfBtnGuardar").addEventListener("click", vfGuardar);
@@ -3608,6 +3618,6 @@
   // ---------- Init ----------
   init();
 })();
-</script>   
+</script>
 </body>
 </html>
