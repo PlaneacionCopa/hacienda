@@ -692,8 +692,7 @@
 
       <div class="vf-card">
         <div class="vf-card-title"><span class="n">3</span>Cuadro 1 — Vigencias futuras por fuente de financiación</div>
-        <div class="vf-toolbar">
-          <select id="vfFuenteSel"></select>
+        <div class="vf-toolbar" style="justify-content:flex-end;">
           <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMas">+ Año</button>
           <button type="button" class="btn btn-ghost btn-sm" id="vfBtnAnioMenos">− Año</button>
         </div>
@@ -2088,7 +2087,6 @@
     fillSelect(f.fuente, FUENTES_OPTIONS);
     fillSelect(f.vf2026Fuente, FUENTES_OPTIONS);
     fillSelect(f.vf2027Fuente, FUENTES_OPTIONS);
-    var vfSel = document.getElementById("vfFuenteSel"); if (vfSel) fillSelect(vfSel, FUENTES_OPTIONS, "Agregar fuente de financiación...");
     if (f.fuente) f.fuente.value = prevFuente;
   }
 
@@ -2348,10 +2346,17 @@
 
   function vfHoy(){ var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
+  var VF_FUENTES = ["RECURSOS PROPIOS", "TRANSFERENCIAS DE LA NACIÓN", "RECURSOS CRÉDITO MUNICIPIO"];
+  function vfFuentesBase(prev){
+    return VF_FUENTES.map(function(n){
+      var p = (prev || []).filter(function(f){ return f.nombre === n; })[0];
+      return p ? { nombre: n, actual: Number(p.actual) || 0, valores: p.valores || {} } : { nombre: n, actual: 0, valores: {} };
+    });
+  }
   function vfNewDraft(){
     var d = {
       id: null, fecha: vfHoy(), codigo: "", nombre: "", descripcion: "", tipo: "ordinaria", importancia: "no", fechaConsejo: "", solicitud: "no",
-      anios: [2026, 2027], fuentes: [], componentes: [{ nombre: "", valor: 0, tipo: "directa" }], giros: {}, pdfPath: null, pdfNombre: null, pdfQuitar: false
+      anios: [2026, 2027], fuentes: vfFuentesBase(), componentes: [{ nombre: "", valor: 0, tipo: "directa" }], giros: {}, pdfPath: null, pdfNombre: null, pdfQuitar: false
     };
     vfEnsureGiros(d);
     return d;
@@ -2369,7 +2374,7 @@
       tipo: r.tipo || "ordinaria", importancia: r.importancia_estrategica || "no",
       fechaConsejo: r.fecha_consejo_gobierno || "", solicitud: r.solicitud_con_presupuesto || "no",
       anios: Array.isArray(dat.anios) && dat.anios.length ? dat.anios.map(Number) : [2026, 2027],
-      fuentes: Array.isArray(dat.fuentes) ? dat.fuentes.map(function(f){ return { nombre: f.nombre, actual: Number(f.actual) || 0, valores: f.valores || {} }; }) : [],
+      fuentes: vfFuentesBase(Array.isArray(dat.fuentes) ? dat.fuentes : []),
       componentes: Array.isArray(dat.componentes) && dat.componentes.length ? dat.componentes.map(function(c){ return { nombre: c.nombre || "", valor: Number(c.valor) || 0, tipo: c.tipo || "directa" }; }) : [{ nombre: "", valor: 0, tipo: "directa" }],
       giros: dat.giros || {}, pdfPath: r.pdf_path || null, pdfNombre: r.pdf_nombre || null, pdfQuitar: false
     };
@@ -2608,25 +2613,21 @@
   // ----- Cuadro 1 -----
   function vfRenderCuadro1(){
     var d = vfDraft, nY = d.anios.length;
-    var cols = "minmax(220px,2fr) repeat(" + (nY + 1) + ",minmax(120px,1fr)) minmax(120px,1fr) 34px";
+    var cols = "minmax(200px,1.6fr) repeat(" + (nY + 1) + ",minmax(104px,1fr)) minmax(110px,1fr)";
     var h = '<div class="vf2-table" style="grid-template-columns:' + cols + ';"><div class="vf2-row vf2-head"><div>Fuente de financiación</div><div>Apropiación vigencia actual</div>' +
-      d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '<div>Total VF</div><div></div></div>';
+      d.anios.map(function(a){ return '<div>' + a + '</div>'; }).join("") + '<div>Total VF</div></div>';
     d.fuentes.forEach(function(fu, i){
       h += '<div class="vf2-row"><div class="vf2-name">' + escapeHtml(fu.nombre) + '</div>' +
         '<div><input inputmode="numeric" data-c1="' + i + '|actual" value="' + vfMoneyStr(fu.actual) + '" placeholder="$0"></div>' +
         d.anios.map(function(a){ return '<div><input inputmode="numeric" data-c1="' + i + '|' + a + '" value="' + vfMoneyStr(fu.valores[a]) + '" placeholder="$0"></div>'; }).join("") +
-        '<div class="vf2-tot" id="vfRowTot' + i + '">$0</div><div><button type="button" class="vf2-x" data-c1del="' + i + '">×</button></div></div>';
+        '<div class="vf2-tot" id="vfRowTot' + i + '">$0</div></div>';
     });
-    if (!d.fuentes.length) h += '<div style="grid-column:1/-1;border-top:1px solid var(--line);padding:.9rem;color:var(--ink-soft);font-size:.82rem;text-align:center;">Agregue al menos una fuente de financiación con el selector de arriba.</div>';
     h += '<div class="vf2-row vf2-foot"><div>TOTAL</div><div id="vfTotActual">$0</div>' +
-      d.anios.map(function(a){ return '<div id="vfTotY' + a + '">$0</div>'; }).join("") + '<div id="vfTotVF">$0</div><div></div></div></div>';
+      d.anios.map(function(a){ return '<div id="vfTotY' + a + '">$0</div>'; }).join("") + '<div id="vfTotVF">$0</div></div></div>';
     document.getElementById("vfCuadro1").innerHTML = '<div class="vf2-scroll">' + h + '</div>';
     document.querySelectorAll("#vfCuadro1 [data-c1]").forEach(function(inp){
       var p = inp.getAttribute("data-c1").split("|"), i = Number(p[0]), key = p[1];
       vfMoneyInput(inp, function(n){ if (key === "actual") d.fuentes[i].actual = n; else d.fuentes[i].valores[key] = n; });
-    });
-    document.querySelectorAll("#vfCuadro1 [data-c1del]").forEach(function(b){
-      b.addEventListener("click", function(){ d.fuentes.splice(Number(b.getAttribute("data-c1del")), 1); vfRenderCuadro1(); vfUpdateTotals(); });
     });
     document.getElementById("vfBtnAnioMenos").style.display = d.anios.length > 2 ? "inline-flex" : "none";
     document.getElementById("vfBtnAnioMas").style.display = d.anios.length < VF_MAX_ANIOS ? "inline-flex" : "none";
@@ -2748,7 +2749,6 @@
     document.querySelector('input[name="vf_imp"][value="' + d.importancia + '"]').checked = true;
     document.querySelector('input[name="vf_sol"][value="' + d.solicitud + '"]').checked = true;
     document.getElementById("vfFechaConsejo").value = d.fechaConsejo;
-    document.getElementById("vfFuenteSel").value = "";
     document.getElementById("vfPdfFile").value = "";
     ["err_vf_codigo","err_vf_nombre","err_vf_desc","err_vf_global"].forEach(function(id){ document.getElementById(id).textContent = ""; });
     vfUpdateVisibility(); vfRenderCuadro1(); vfRenderCuadro2(); vfRenderCuadro3(); vfRenderPdfInfo(); vfUpdateTotals();
@@ -2772,7 +2772,7 @@
     if (!d.descripcion){ document.getElementById("err_vf_desc").textContent = "Escriba la descripción del objeto de gasto."; ok = false; }
     var T = vfTotals(d);
     var msgs = [];
-    if (!d.fuentes.length) msgs.push("Agregue al menos una fuente de financiación en el Cuadro 1.");
+    if (!(vfTotals(d).vfTotal > 0)) msgs.push("Ingrese los valores de vigencias futuras en el Cuadro 1.");
     if (T.contratar <= 0) msgs.push("Ingrese el valor a contratar en el Cuadro 2.");
     else if (T.giros !== T.contratar) msgs.push("El plan de pagos (Cuadro 3) debe sumar exactamente el total a contratar del Cuadro 2.");
     if (d.importancia === "si" && !d.fechaConsejo) msgs.push("Indique la fecha del Consejo de Gobierno.");
@@ -2882,7 +2882,6 @@
 
   (function vfInit(){
     fillSelect(document.getElementById("vfCodigo"), BPIN_OPTIONS, "Seleccionar proyecto...");
-    fillSelect(document.getElementById("vfFuenteSel"), FUENTES_OPTIONS, "Agregar fuente de financiación...");
     document.getElementById("vfBtnNueva").addEventListener("click", function(){ vfOpenModal(null); });
     document.getElementById("vfBtnAbrir").addEventListener("click", function(){ document.getElementById("overlayVfLista").classList.add("open"); });
     document.getElementById("vfBtnListaClose").addEventListener("click", function(){ document.getElementById("overlayVfLista").classList.remove("open"); });
@@ -2890,11 +2889,6 @@
     document.getElementById("vfBtnCancelar").addEventListener("click", vfCloseModal);
     document.getElementById("vfBtnGuardar").addEventListener("click", vfGuardar);
     document.querySelectorAll('input[name="vf_imp"]').forEach(function(r){ r.addEventListener("change", function(){ vfDraft.importancia = r.value; vfUpdateVisibility(); }); });
-    document.getElementById("vfFuenteSel").addEventListener("change", function(){
-      var v = this.value; if (!v) return;
-      if (!vfDraft.fuentes.some(function(f){ return f.nombre === v; })) vfDraft.fuentes.push({ nombre: v, actual: 0, valores: {} });
-      this.value = ""; vfRenderCuadro1(); vfUpdateTotals();
-    });
     document.getElementById("vfBtnAnioMas").addEventListener("click", function(){
       var d = vfDraft; if (d.anios.length >= VF_MAX_ANIOS) return;
       d.anios.push(d.anios[d.anios.length - 1] + 1); vfEnsureGiros(d);
