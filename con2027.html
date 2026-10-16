@@ -2079,18 +2079,7 @@
       rows.push({ nombre_fuente: nombre, valor: valor, n_rubros: isNaN(nRubrosNum) ? null : nRubrosNum, pct: pct });
     }
     if (!rows.length) throw new Error("No se encontraron filas de fuentes de financiación en el archivo.");
-    // Si una fuente aparece repetida, se suman sus valores en una sola fila
-    var byName = {}, uniq = [], repetidas = 0;
-    rows.forEach(function(r){
-      var k = r.nombre_fuente.toLowerCase();
-      if (byName[k]){
-        var x = byName[k]; repetidas++;
-        x.valor = (x.valor || 0) + (r.valor || 0);
-        x.n_rubros = (x.n_rubros == null && r.n_rubros == null) ? null : (x.n_rubros || 0) + (r.n_rubros || 0);
-        x.pct = (x.pct == null && r.pct == null) ? null : (x.pct || 0) + (r.pct || 0);
-      } else { byName[k] = r; uniq.push(r); }
-    });
-    return { total: total, rows: uniq, repetidas: repetidas };
+    return { total: total, rows: rows };
   }
 
   function refillFuentesSelects(){
@@ -2327,7 +2316,7 @@
       statusEl.textContent = "Guardando " + parsed.rows.length + " fuentes...";
       var res = await sb.rpc("admin_set_fuentes_ingresos", { p_rows: parsed.rows, p_total: parsed.total });
       if (res.error) throw res.error;
-      statusEl.textContent = "✔ Cargado: " + parsed.rows.length + " fuentes · total ingresos " + fmtCOP(parsed.total) + (parsed.repetidas ? " · " + parsed.repetidas + " filas repetidas se sumaron" : "");
+      statusEl.textContent = "✔ Cargado: " + parsed.rows.length + " fuentes · total ingresos " + fmtCOP(parsed.total);
       fileInput.value = "";
       await loadFuentesCatalogo();
       await renderPresupuestoPanel();
