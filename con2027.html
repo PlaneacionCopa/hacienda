@@ -751,6 +751,10 @@
             <input id="f_nombre" placeholder="Nombre completo">
           </div>
         </div>
+        <div class="field" id="ppWrap" style="margin-top:.9rem;display:none;">
+          <label for="f_pp">PP</label>
+          <input id="f_pp" placeholder="Solo visible para administrador y alcalde" autocomplete="off">
+        </div>
         <div class="field" style="margin-top:.9rem;">
           <label for="f_foto" id="lblFoto">Foto del contratista</label>
           <div class="foto-row">
@@ -1710,9 +1714,16 @@
       });
     }
 
+    var ppByItem = {};
+    if (itemIds.length && profile && (profile.role === "admin" || profile.role === "alcalde")){
+      var ppRes = await sb.from("priorizacion_pp").select("item_id, pp").in("item_id", itemIds);
+      (ppRes.data || []).forEach(function(r){ ppByItem[r.item_id] = r.pp || ""; });
+    }
+
     state.items = rawItems.map(function(i){
       return {
         id: i.id,
+        pp: ppByItem[i.id] || "",
         identificacionTercero: i.identificacion_tercero,
         nombreTercero: i.nombre_tercero,
         actividad: i.actividad,
@@ -1808,6 +1819,7 @@
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
+          (item.pp ? '<span class="tag" style="background:#fff7e6;color:#b45309;">PP: ' + escapeHtml(item.pp) + '</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' : '') +
         '</div>';
@@ -2079,7 +2091,18 @@
       rows.push({ nombre_fuente: nombre, valor: valor, n_rubros: isNaN(nRubrosNum) ? null : nRubrosNum, pct: pct });
     }
     if (!rows.length) throw new Error("No se encontraron filas de fuentes de financiación en el archivo.");
-    return { total: total, rows: rows };
+    // Si una fuente aparece repetida, se suman sus valores en una sola fila
+    var byName = {}, uniq = [], repetidas = 0;
+    rows.forEach(function(r){
+      var k = r.nombre_fuente.toLowerCase();
+      if (byName[k]){
+        var x = byName[k]; repetidas++;
+        x.valor = (x.valor || 0) + (r.valor || 0);
+        x.n_rubros = (x.n_rubros == null && r.n_rubros == null) ? null : (x.n_rubros || 0) + (r.n_rubros || 0);
+        x.pct = (x.pct == null && r.pct == null) ? null : (x.pct || 0) + (r.pct || 0);
+      } else { byName[k] = r; uniq.push(r); }
+    });
+    return { total: total, rows: uniq, repetidas: repetidas };
   }
 
   function refillFuentesSelects(){
@@ -2316,7 +2339,7 @@
       statusEl.textContent = "Guardando " + parsed.rows.length + " fuentes...";
       var res = await sb.rpc("admin_set_fuentes_ingresos", { p_rows: parsed.rows, p_total: parsed.total });
       if (res.error) throw res.error;
-      statusEl.textContent = "✔ Cargado: " + parsed.rows.length + " fuentes · total ingresos " + fmtCOP(parsed.total);
+      statusEl.textContent = "✔ Cargado: " + parsed.rows.length + " fuentes · total ingresos " + fmtCOP(parsed.total) + (parsed.repetidas ? " · " + parsed.repetidas + " filas repetidas se sumaron" : "");
       fileInput.value = "";
       await loadFuentesCatalogo();
       await renderPresupuestoPanel();
@@ -2966,12 +2989,18 @@
         });
       }
 
+      var ppByItemX = {};
+      if (allIds.length){
+        var ppResX = await sb.from("priorizacion_pp").select("item_id, pp").in("item_id", allIds);
+        (ppResX.data || []).forEach(function(r){ ppByItemX[r.item_id] = r.pp || ""; });
+      }
+
       var listasRes = await sb.from("priorizacion_listas").select("secretaria_id, status, enviado_at");
       var listaBySec = {};
       (listasRes.data || []).forEach(function(l){ listaBySec[l.secretaria_id] = l; });
 
       var headers = [
-        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","Foto",
+        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
         "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
@@ -2999,6 +3028,7 @@
           i.tipo_necesidad === "funcionamiento" ? "Funcionamiento" : "Inversión",
           i.identificacion_tercero || "",
           i.nombre_tercero || "",
+          ppByItemX[i.id] || "",
           i.foto_url || "",
           i.actividad || "",
           i.objeto || "",
@@ -3431,6 +3461,10 @@
 
     f.identificacion.value = item ? item.identificacionTercero || "" : "";
     f.nombre.value = item ? item.nombreTercero || "" : "";
+    var ppVer = profile && (profile.role === "admin" || profile.role === "alcalde");
+    document.getElementById("ppWrap").style.display = ppVer ? "block" : "none";
+    document.getElementById("f_pp").value = item ? item.pp || "" : "";
+    document.getElementById("f_pp").disabled = !(profile && profile.role === "admin");
     f.actividad.value = item ? item.actividad || "" : "";
     f.servicio.value = item ? item.servicioContratar || "" : "";
     f.objeto.value = item ? item.objeto || "" : "";
@@ -3647,6 +3681,21 @@
     if (res.error){
       alert("No se pudo guardar: " + res.error.message);
       return;
+    }
+    if (profile.role === "admin"){
+      var ppNuevo = document.getElementById("f_pp").value.trim();
+      var itemIdPP = editingId || (typeof res.data === "string" ? res.data : (res.data && (res.data.id || res.data.item_id)) || null);
+      if (itemIdPP){
+        var ppPrev = (state.items.find(function(i){ return i.id === itemIdPP; }) || {}).pp || "";
+        if (ppNuevo !== ppPrev){
+          var ppRes = ppNuevo
+            ? await sb.from("priorizacion_pp").upsert({ item_id: itemIdPP, pp: ppNuevo, updated_by: profile.id, updated_at: new Date().toISOString() })
+            : await sb.from("priorizacion_pp").delete().eq("item_id", itemIdPP);
+          if (ppRes.error) alert("La necesidad se guardó, pero no se pudo guardar el PP: " + ppRes.error.message);
+        }
+      } else if (ppNuevo){
+        alert("La necesidad se guardó, pero no se pudo asociar el PP. Ábrala de nuevo y escriba el PP.");
+      }
     }
     closeModal();
     await loadSecretariaData();
