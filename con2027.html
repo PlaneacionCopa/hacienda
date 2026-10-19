@@ -1899,7 +1899,7 @@
         delBtn.textContent = "Eliminar";
         delBtn.onclick = async function(){
           var desdeO = currentSecretariaId === "oculto";
-          if (!confirm(desdeO ? "¿Eliminar esta necesidad? Pasará a \"E\" (no se borra, no suma en ningún total y la puedes restaurar)." : "¿Eliminar esta necesidad de la lista?")) return;
+          if (!desdeO && !confirm("¿Eliminar esta necesidad de la lista? Esta acción no se puede deshacer.")) return;
           var res = desdeO
             ? await sb.rpc("mover_a_papelera", { p_item_id: String(item.id) })
             : await sb.rpc("eliminar_necesidad", { p_item_id: item.id });
@@ -1915,7 +1915,6 @@
         hideBtn.textContent = enOcultos ? "Reactivar" : "X";
         hideBtn.onclick = async function(){
           var msg = enOcultos ? "¿Reactivar esta necesidad y devolverla a su secretaría de origen?" : "¿Ocultar esta necesidad? Dejará de verla la secretaría y no contará en los totales hasta que la reactive desde \"O\".";
-          if (!confirm(msg)) return;
           var res = await sb.rpc("ocultar_necesidad", { p_item_id: item.id, p_oculto: !enOcultos });
           if (res.error){ alert("No se pudo " + (enOcultos ? "reactivar" : "ocultar") + ": " + res.error.message); return; }
           await loadSecretariaData();
