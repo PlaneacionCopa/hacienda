@@ -481,16 +481,6 @@
 
     <div class="pres-section-title" id="presFuncSection">Funcionamiento y servicio de la deuda (presupuesto por entidad y fuente)</div>
     <div id="presFuncBlocks" style="padding:1rem 1.4rem 0;display:flex;flex-direction:column;gap:.8rem;"></div>
-    <div class="pres-grid2" style="padding-top:.8rem;">
-      <div class="pres-box total readonly">
-        <label>Funcionamiento total</label>
-        <div class="val" id="presFuncTotal">$0</div>
-      </div>
-      <div class="pres-box total readonly">
-        <label>Servicio de la deuda total</label>
-        <div class="val" id="presDeudaTotal">$0</div>
-      </div>
-    </div>
 
     <div class="pres-section-title">Resumen general del presupuesto</div>
     <div class="pres-grid3">
@@ -2399,8 +2389,6 @@
         '<span class="func-total">Total: ' + fmtCOP(totalEnt) + '</span></div>' + grupos + '</div>';
     }).join("");
     wrap.innerHTML = html;
-    document.getElementById("presFuncTotal").textContent = fmtCOP(totalGeneral);
-    document.getElementById("presDeudaTotal").textContent = fmtCOP(totalDeudaGen);
 
     if (esAdmin){
       wrap.querySelectorAll(".func-block").forEach(function(blk){
