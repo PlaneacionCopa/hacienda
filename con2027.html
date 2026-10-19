@@ -646,6 +646,27 @@
   </div>
 </div>
 
+<!-- Restaurar necesidad desde E -->
+<div class="overlay" id="overlayRestaurar">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+      <h3>Restaurar necesidad</h3>
+      <button class="modal-close" id="btnCloseRestaurar">×</button>
+    </div>
+    <div class="modal-body" style="max-height:none;">
+      <div class="field">
+        <label for="restaurarDestino">Enviar a</label>
+        <select id="restaurarDestino"></select>
+        <div class="hint">"O" la deja oculta (no suma en los totales por secretaría). Una secretaría la devuelve a su lista.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="btnCancelRestaurar">Cancelar</button>
+      <button type="button" class="btn btn-primary" id="btnConfirmRestaurar">Restaurar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Lista de vigencias futuras -->
 <div class="overlay" id="overlayVfLista">
   <div class="modal" style="max-width:820px;">
@@ -1674,11 +1695,11 @@
   // ---------- Vista de captura: setup según rol ----------
   function setupCaptureControls(){
     // La pseudo-secretaría "O" (necesidades ocultas) solo la puede ver y elegir el admin
-    var catalogoVisible = profile.role === "admin" ? secretariasCatalog : secretariasCatalog.filter(function(s){ return s.id !== "oculto"; });
+    var catalogoVisible = profile.role === "admin" ? secretariasCatalog : secretariasCatalog.filter(function(s){ return s.id !== "oculto" && s.id !== "eliminado"; });
     fillSelect(els.secretariaSelect, catalogoVisible.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
     if (profile.role === "admin"){
       els.secretariaSelect.disabled = false;
-      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas.";
+      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas y \"E\" para las eliminadas.";
     } else {
       els.secretariaSelect.disabled = true;
       els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
@@ -1770,19 +1791,43 @@
       .subscribe();
   }
 
+  // ---------- Restaurar desde E ----------
+  var restaurandoId = null;
+  function openRestaurar(itemId){
+    restaurandoId = itemId;
+    var opts = [{ v: "oculto", l: "O — necesidades ocultas" }].concat(
+      secretariasCatalog.filter(function(s){ return s.id !== "oculto" && s.id !== "eliminado"; }).map(function(s){ return { v: s.id, l: s.nombre }; })
+    );
+    fillSelect(document.getElementById("restaurarDestino"), opts, null);
+    document.getElementById("overlayRestaurar").classList.add("open");
+  }
+  function closeRestaurar(){ document.getElementById("overlayRestaurar").classList.remove("open"); restaurandoId = null; }
+  document.getElementById("btnCloseRestaurar").addEventListener("click", closeRestaurar);
+  document.getElementById("btnCancelRestaurar").addEventListener("click", closeRestaurar);
+  document.getElementById("btnConfirmRestaurar").addEventListener("click", async function(){
+    if (!restaurandoId) return;
+    var btn = this; btn.disabled = true;
+    var res = await sb.rpc("restaurar_de_papelera", { p_item_id: String(restaurandoId), p_destino: document.getElementById("restaurarDestino").value });
+    btn.disabled = false;
+    if (res.error){ alert("No se pudo restaurar: " + res.error.message); return; }
+    closeRestaurar();
+    await loadSecretariaData();
+  });
+
   // ---------- Render ----------
   function isLocked(){
     return state.status === "enviado" && profile.role !== "admin";
   }
 
   function renderTopControls(){
-    var esOcultos = currentSecretariaId === "oculto";
+    var esPapelera = currentSecretariaId === "eliminado";
+    var esOcultos = currentSecretariaId === "oculto" || esPapelera;
     var enviado = state.status === "enviado";
     els.statusPill.className = "status-pill " + (enviado ? "status-enviado" : "status-borrador");
     els.statusPill.textContent = enviado ? "✔ Enviado" : "● Borrador";
     els.enviadoBanner.style.display = (enviado && !esOcultos) ? "flex" : "none";
     els.btnReabrir.style.display = (enviado && profile.role === "admin" && !esOcultos) ? "inline-flex" : "none";
-    els.itemsToolbarTitle.textContent = esOcultos ? "Necesidades ocultas" : "Necesidades priorizadas";
+    els.itemsToolbarTitle.textContent = esPapelera ? "Necesidades eliminadas (E)" : (esOcultos ? "Necesidades ocultas" : "Necesidades priorizadas");
     els.btnAdd.style.display = esOcultos ? "none" : "inline-flex";
     els.btnEnviar.style.display = esOcultos ? "none" : "inline-flex";
     els.btnAdd.disabled = isLocked();
@@ -1841,19 +1886,29 @@
       editBtn.textContent = locked ? "Ver" : "Editar";
       editBtn.onclick = function(){ openModal(item.id); };
       actions.appendChild(editBtn);
-      if (!locked){
+      var enPapelera = currentSecretariaId === "eliminado";
+      if (enPapelera && profile.role === "admin"){
+        var restBtn = document.createElement("button");
+        restBtn.className = "btn btn-primary btn-sm";
+        restBtn.textContent = "Restaurar";
+        restBtn.onclick = function(){ openRestaurar(item.id); };
+        actions.appendChild(restBtn);
+      } else if (!locked){
         var delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger-text btn-sm";
         delBtn.textContent = "Eliminar";
         delBtn.onclick = async function(){
-          if (!confirm("¿Eliminar esta necesidad de la lista?")) return;
-          var res = await sb.rpc("eliminar_necesidad", { p_item_id: item.id });
+          var desdeO = currentSecretariaId === "oculto";
+          if (!confirm(desdeO ? "¿Eliminar esta necesidad? Pasará a \"E\" (no se borra, no suma en ningún total y la puedes restaurar)." : "¿Eliminar esta necesidad de la lista?")) return;
+          var res = desdeO
+            ? await sb.rpc("mover_a_papelera", { p_item_id: String(item.id) })
+            : await sb.rpc("eliminar_necesidad", { p_item_id: item.id });
           if (res.error){ alert("No se pudo eliminar: " + res.error.message); return; }
           await loadSecretariaData();
         };
         actions.appendChild(delBtn);
       }
-      if (profile.role === "admin"){
+      if (profile.role === "admin" && !enPapelera){
         var enOcultos = currentSecretariaId === "oculto";
         var hideBtn = document.createElement("button");
         hideBtn.className = "btn btn-danger-text btn-sm";
@@ -1910,7 +1965,7 @@
 
   async function loadDashboard(){
     var resumenRes = await sb.from("priorizacion_resumen").select("*").order("total_proyectado", { ascending: false });
-    var resumen = resumenRes.data || [];
+    var resumen = (resumenRes.data || []).filter(function(r){ return r.secretaria_id !== "eliminado"; });
 
     var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar").eq("oculto", false);
     var items = itemsRes.data || [];
@@ -2009,7 +2064,7 @@
     var el = document.getElementById("adminOverviewTable");
     var totalBox = document.getElementById("adminOverviewTotalBox");
     if (res.error){ el.innerHTML = "<p>No se pudo cargar el panel.</p>"; return; }
-    var data = res.data || [];
+    var data = (res.data || []).filter(function(r){ return r.secretaria_id !== "eliminado"; });
     var totalGeneral = data.reduce(function(s,r){ return s + Number(r.total_proyectado||0); }, 0);
     var enviadas = data.filter(function(r){ return r.status === "enviado"; }).length;
     totalBox.textContent = enviadas + " de " + data.length + " secretarías enviaron su lista · Total: " + fmtCOP(totalGeneral);
@@ -2149,7 +2204,7 @@
     var cfgRes = await sb.from("presupuesto_config").select("*").eq("id", "singleton").maybeSingle();
     var cfg = cfgRes.data || { total_presupuesto_ingresos: null, servicio_deuda: 0 };
 
-    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total");
+    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total").eq("eliminado", false);
     var items = itemsRes.data || [];
     var idsInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; }).map(function(i){ return i.id; });
     var totalFuncionamiento = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento"; })
@@ -2906,7 +2961,7 @@
 
   async function vfCargarLista(){
     var card = document.getElementById("vfCard");
-    if (!profile || profile.role === "alcalde" || !currentSecretariaId || currentSecretariaId === "oculto"){ card.style.display = "none"; return; }
+    if (!profile || profile.role === "alcalde" || !currentSecretariaId || currentSecretariaId === "oculto" || currentSecretariaId === "eliminado"){ card.style.display = "none"; return; }
     card.style.display = "block";
     var res = await sb.from("vigencias_futuras_solicitudes").select("*").eq("secretaria_id", currentSecretariaId).order("created_at", { ascending: true });
     if (res.error){
@@ -2974,7 +3029,7 @@
       if (itemsRes.error) throw itemsRes.error;
       var items = itemsRes.data || [];
 
-      var ocultosRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", true).order("oculto_at", { ascending: false });
+      var ocultosRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", true).eq("eliminado", false).order("oculto_at", { ascending: false });
       var ocultos = ocultosRes.data || [];
 
       var allIds = items.map(function(i){ return i.id; }).concat(ocultos.map(function(i){ return i.id; }));
