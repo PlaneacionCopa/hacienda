@@ -2003,7 +2003,7 @@
     var resumenRes = await sb.from("priorizacion_resumen").select("*").order("total_proyectado", { ascending: false });
     var resumen = (resumenRes.data || []).filter(function(r){ return r.secretaria_id !== "eliminado"; });
 
-    var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar").eq("oculto", false);
+    var itemsRes = await sb.from("priorizacion_items").select("servicio_contratar").eq("eliminado", false);
     var items = itemsRes.data || [];
 
     var totalGeneral = resumen.reduce(function(s,r){ return s + Number(r.total_proyectado||0); }, 0);
