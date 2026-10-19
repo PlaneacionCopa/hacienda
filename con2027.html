@@ -2251,8 +2251,19 @@
     funcAuto = {};
     ["inder", "invicop"].forEach(function(sid){
       var its = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento" && i.secretaria_id === sid; });
-      funcAuto[sid] = { total: its.reduce(function(s,i){ return s + Number(i.total||0); }, 0), n: its.length };
+      funcAuto[sid] = { total: its.reduce(function(s,i){ return s + Number(i.total||0); }, 0), n: its.length, fuentes: {}, ids: its.map(function(i){ return i.id; }) };
     });
+    var idsAuto = [];
+    Object.keys(funcAuto).forEach(function(k){ idsAuto = idsAuto.concat(funcAuto[k].ids); });
+    if (idsAuto.length){
+      var faRes = await sb.from("priorizacion_fuentes").select("item_id, nombre, valor").in("item_id", idsAuto);
+      (faRes.data || []).forEach(function(r){
+        Object.keys(funcAuto).forEach(function(k){
+          if (funcAuto[k].ids.indexOf(r.item_id) < 0) return;
+          funcAuto[k].fuentes[r.nombre] = (funcAuto[k].fuentes[r.nombre] || 0) + Number(r.valor || 0);
+        });
+      });
+    }
     var gastoPorFuente = {};
     var gastoNombre = {};
     // Clave de fuente: el código (ej. 23005) si lo tiene; si no, el nombre sin tildes/espacios dobles.
@@ -2279,6 +2290,14 @@
           var k = fkey(x.nombre); if (!gastoNombre[k]) gastoNombre[k] = x.nombre;
           gastoPorFuente[k] = (gastoPorFuente[k] || 0) + x.valor;
         });
+      });
+    });
+
+    // Honorarios de INDER/INVICOP (necesidades de funcionamiento) por fuente
+    Object.keys(funcAuto).forEach(function(k){
+      Object.keys(funcAuto[k].fuentes).forEach(function(nombre){
+        var kk = fkey(nombre); if (!gastoNombre[kk]) gastoNombre[kk] = nombre;
+        gastoPorFuente[kk] = (gastoPorFuente[kk] || 0) + funcAuto[k].fuentes[nombre];
       });
     });
 
@@ -2399,7 +2418,14 @@
         var h = '<div data-grp="' + g.key + '" style="margin-top:.4rem;">';
         if (g.label) h += '<div class="func-head" style="margin-bottom:.1rem;"><span class="section-label">' + g.label + '</span><span class="func-total">' + fmtCOP(sub) + '</span></div>';
         if (auto){
-          return h + '<div class="func-row"><span>Necesidades de funcionamiento cargadas por la secretaría (' + auto.n + ')</span><span class="num">' + fmtCOP(sub) + '</span><span></span></div></div>';
+          var fa = auto.fuentes || {}, conFuente = 0;
+          var filas = Object.keys(fa).sort().map(function(nm){
+            conFuente += fa[nm];
+            return '<div class="func-row"><span>' + escapeHtml(nm) + '</span><span class="num">' + fmtCOP(fa[nm]) + '</span><span></span></div>';
+          }).join("");
+          if (sub - conFuente > 0) filas += '<div class="func-row"><span>Sin fuente asignada</span><span class="num">' + fmtCOP(sub - conFuente) + '</span><span></span></div>';
+          if (!filas) filas = '<div class="func-row"><span>Sin necesidades de funcionamiento cargadas</span><span class="num">' + fmtCOP(0) + '</span><span></span></div>';
+          return h + filas + '</div>';
         }
         h += arr.map(function(x, idx){
           return '<div class="func-row"><span>' + escapeHtml(x.nombre) + '</span><span class="num">' + fmtCOP(x.valor) + '</span>' +
