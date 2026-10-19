@@ -317,6 +317,13 @@
   .vf-addrow{margin-top:.7rem;}
   .vf-pdf{display:flex;flex-direction:column;gap:.5rem;}
   .vf-pdf input[type=file]{padding:.55rem;background:#fff;border:1px dashed var(--navy-700);}
+  .quicknav{display:none;position:sticky;top:0;z-index:30;margin:0 0 1rem;padding:.6rem .2rem;gap:.5rem;flex-wrap:wrap;align-items:center;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);}
+  .quicknav.show{display:flex;}
+  .quicknav .qn-lbl{font-size:.8rem;font-weight:600;color:var(--ink-soft);margin-right:.2rem;}
+  .quicknav button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:.38rem .9rem;font:inherit;font-size:.82rem;font-weight:600;color:var(--ink);cursor:pointer;}
+  .quicknav button:hover{background:var(--navy-050);border-color:var(--navy-700);color:var(--navy-800);}
+  .card{scroll-margin-top:70px;}
+  #presFuncSection{scroll-margin-top:70px;}
   .foto-row{display:flex;align-items:center;gap:.8rem;}
   .foto-preview{
     width:96px;height:120px;border-radius:9px;object-fit:cover;border:1px solid var(--line);
@@ -420,6 +427,15 @@
     </div>
   </div>
 
+  <!-- Acceso directo a secciones (admin / alcalde) -->
+  <nav class="quicknav" id="quickNav">
+    <span class="qn-lbl">Ir a:</span>
+    <button type="button" data-qn="adminOverviewCard">Panel de administración</button>
+    <button type="button" data-qn="presupuestoCard">Presupuesto 2027</button>
+    <button type="button" data-qn="presFuncSection">Funcionamiento y deuda</button>
+    <button type="button" data-qn="captureCard">Edición de secretarías</button>
+  </nav>
+
   <!-- Panel de control del admin: vista de todas las secretarías -->
   <div class="card" id="adminOverviewCard" style="display:none;margin-bottom:1.25rem;">
     <div class="toolbar">
@@ -463,7 +479,7 @@
       </div>
     </div>
 
-    <div class="pres-section-title">Funcionamiento y servicio de la deuda (presupuesto por entidad y fuente)</div>
+    <div class="pres-section-title" id="presFuncSection">Funcionamiento y servicio de la deuda (presupuesto por entidad y fuente)</div>
     <div id="presFuncBlocks" style="padding:1rem 1.4rem 0;display:flex;flex-direction:column;gap:.8rem;"></div>
     <div class="pres-grid2" style="padding-top:.8rem;">
       <div class="pres-box total readonly">
@@ -1633,6 +1649,31 @@
     document.getElementById("userBadge").textContent = (profile.full_name || "") + " · " + roleLabel;
   }
 
+  function updateQuickNav(){
+    var nav = document.getElementById("quickNav");
+    if (!nav) return;
+    var visible = profile && (profile.role === "admin" || profile.role === "alcalde");
+    var alguno = false;
+    nav.querySelectorAll("[data-qn]").forEach(function(b){
+      var t = document.getElementById(b.getAttribute("data-qn"));
+      var cardPadre = t && (t.closest ? t.closest(".card") : null);
+      var ok = !!(visible && t && (cardPadre || t).style.display !== "none");
+      b.style.display = ok ? "" : "none";
+      if (ok) alguno = true;
+    });
+    nav.classList.toggle("show", visible && alguno);
+  }
+  (function(){
+    var nav = document.getElementById("quickNav");
+    if (!nav) return;
+    nav.addEventListener("click", function(e){
+      var b = e.target.closest ? e.target.closest("[data-qn]") : null;
+      if (!b) return;
+      var t = document.getElementById(b.getAttribute("data-qn"));
+      if (t && t.scrollIntoView) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  })();
+
   async function afterLogin(){
     try{
       var userRes = await sb.auth.getUser();
@@ -1675,6 +1716,7 @@
         }
         await loadSecretariaData();
       }
+      updateQuickNav();
     }catch(err){
       console.error(err);
       alert("No se pudo cargar tu perfil. Contacta al administrador.");
