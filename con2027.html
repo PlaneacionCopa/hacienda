@@ -140,6 +140,7 @@
     font-size:.7rem;font-weight:600;padding:.22rem .55rem;border-radius:6px;
     background:var(--navy-050);color:var(--navy-800);white-space:normal;overflow-wrap:anywhere;max-width:100%;
   }
+  .num-badge{display:inline-block;min-width:1.7rem;text-align:center;margin-right:.5rem;padding:.12rem .45rem;border-radius:6px;background:var(--navy-800,#1e3a5f);color:#fff;font-size:.75rem;font-weight:700;vertical-align:middle;}
   .item-actions{display:flex;gap:.35rem;flex-shrink:0;}
   .item-bottom{
     display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;
@@ -1751,7 +1752,7 @@
     var listaRes = await sb.from("priorizacion_listas").select("status").eq("secretaria_id", currentSecretariaId).single();
     state.status = (listaRes.data && listaRes.data.status) || "borrador";
 
-    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).order("created_at", { ascending: true });
+    var itemsRes = await sb.from("priorizacion_items").select("*").eq("secretaria_id", currentSecretariaId).order("numero", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true });
     var rawItems = itemsRes.data || [];
     var itemIds = rawItems.map(function(i){ return i.id; });
 
@@ -1779,6 +1780,7 @@
     state.items = rawItems.map(function(i){
       return {
         id: i.id,
+        numero: i.numero,
         pp: ppByItem[i.id] || "",
         observaciones: obsByItem[i.id] || "",
         identificacionTercero: i.identificacion_tercero,
@@ -1892,6 +1894,7 @@
       var left = document.createElement("div");
       left.innerHTML =
         (item.fotoUrl ? '<img src="' + escapeHtml(item.fotoUrl) + '" class="foto-thumb" alt="">' : '') +
+        (item.numero ? '<span class="num-badge">' + item.numero + '</span>' : '') +
         '<div class="item-objeto" style="display:inline;">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
         '<div class="item-tags">' +
           '<span class="tag">' + (item.tipoNecesidad === "funcionamiento" ? "Funcionamiento" : "Inversión") + '</span>' +
@@ -3054,7 +3057,7 @@
     }
     btn.disabled = true; btn.textContent = "Generando...";
     try{
-      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", false).order("secretaria_id", { ascending: true });
+      var itemsRes = await sb.from("priorizacion_items").select("*, secretarias!priorizacion_items_secretaria_id_fkey(nombre)").eq("oculto", false).order("secretaria_id", { ascending: true }).order("numero", { ascending: true });
       if (itemsRes.error) throw itemsRes.error;
       var items = itemsRes.data || [];
 
@@ -3088,7 +3091,7 @@
       (listasRes.data || []).forEach(function(l){ listaBySec[l.secretaria_id] = l; });
 
       var headers = [
-        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Observaciones","Foto",
+        "Secretaría","N°","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Observaciones","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
         "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
@@ -3112,6 +3115,7 @@
         }).join(" | ");
         return [
           i.secretarias ? i.secretarias.nombre : i.secretaria_id,
+          i.numero || "",
           estado,
           i.tipo_necesidad === "funcionamiento" ? "Funcionamiento" : "Inversión",
           i.identificacion_tercero || "",
