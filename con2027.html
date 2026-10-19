@@ -755,6 +755,8 @@
         <div class="field" id="ppWrap" style="margin-top:.9rem;display:none;">
           <label for="f_pp">PP</label>
           <input id="f_pp" placeholder="Solo visible para administrador y alcalde" autocomplete="off">
+          <label for="f_obs" style="margin-top:.7rem;">Observaciones</label>
+          <textarea id="f_obs" rows="2" placeholder="Solo visible para administrador y alcalde"></textarea>
         </div>
         <div class="field" style="margin-top:.9rem;">
           <label for="f_foto" id="lblFoto">Foto del contratista</label>
@@ -910,7 +912,7 @@
         <div class="field" style="margin-top:.6rem;">
           <label for="f_fuente">Agregar fuente</label>
           <select id="f_fuente"></select>
-          <div class="hint">El valor por fuente es opcional, solo de referencia (no tiene que cuadrar con ningún total).</div>
+          <div class="hint">Con una sola fuente se carga automáticamente el total del contrato. Con varias fuentes, escriba el valor de cada una (opcional, solo de referencia).</div>
         </div>
         <div id="fuentesList" style="margin-top:.6rem;display:flex;flex-direction:column;gap:.4rem;"></div>
       </div>
@@ -1715,16 +1717,17 @@
       });
     }
 
-    var ppByItem = {};
+    var ppByItem = {}, obsByItem = {};
     if (itemIds.length && profile && (profile.role === "admin" || profile.role === "alcalde")){
-      var ppRes = await sb.from("priorizacion_pp").select("item_id, pp").in("item_id", itemIds);
-      (ppRes.data || []).forEach(function(r){ ppByItem[r.item_id] = r.pp || ""; });
+      var ppRes = await sb.from("priorizacion_pp").select("item_id, pp, observaciones").in("item_id", itemIds);
+      (ppRes.data || []).forEach(function(r){ ppByItem[r.item_id] = r.pp || ""; obsByItem[r.item_id] = r.observaciones || ""; });
     }
 
     state.items = rawItems.map(function(i){
       return {
         id: i.id,
         pp: ppByItem[i.id] || "",
+        observaciones: obsByItem[i.id] || "",
         identificacionTercero: i.identificacion_tercero,
         nombreTercero: i.nombre_tercero,
         actividad: i.actividad,
@@ -1814,13 +1817,13 @@
         (item.fotoUrl ? '<img src="' + escapeHtml(item.fotoUrl) + '" class="foto-thumb" alt="">' : '') +
         '<div class="item-objeto" style="display:inline;">' + escapeHtml(item.objeto || "(Sin objeto)") + '</div>' +
         '<div class="item-tags">' +
-          (item.oculto ? '<span class="tag tag-oculto">🙈 Oculto — no cuenta en los totales</span>' : '') +
           '<span class="tag">' + (item.tipoNecesidad === "funcionamiento" ? "Funcionamiento" : "Inversión") + '</span>' +
           '<span class="tag">' + escapeHtml(item.servicioContratar || "Servicio no definido") + '</span>' +
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
           (item.pp ? '<span class="tag" style="background:#fff7e6;color:#b45309;">PP: ' + escapeHtml(item.pp) + '</span>' : '') +
+          (item.observaciones ? '<span class="tag" style="background:#eef7ee;color:#166534;">Observaciones: ' + escapeHtml(item.observaciones) + '</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.indicador ? item.indicador.length : 0) + ' indicador(es)</span>' : '') +
         '</div>';
@@ -2146,7 +2149,7 @@
     var cfgRes = await sb.from("presupuesto_config").select("*").eq("id", "singleton").maybeSingle();
     var cfg = cfgRes.data || { total_presupuesto_ingresos: null, servicio_deuda: 0 };
 
-    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total").eq("oculto", false);
+    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total");
     var items = itemsRes.data || [];
     var idsInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; }).map(function(i){ return i.id; });
     var totalFuncionamiento = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento"; })
@@ -2990,10 +2993,10 @@
         });
       }
 
-      var ppByItemX = {};
+      var ppByItemX = {}, obsByItemX = {};
       if (allIds.length){
-        var ppResX = await sb.from("priorizacion_pp").select("item_id, pp").in("item_id", allIds);
-        (ppResX.data || []).forEach(function(r){ ppByItemX[r.item_id] = r.pp || ""; });
+        var ppResX = await sb.from("priorizacion_pp").select("item_id, pp, observaciones").in("item_id", allIds);
+        (ppResX.data || []).forEach(function(r){ ppByItemX[r.item_id] = r.pp || ""; obsByItemX[r.item_id] = r.observaciones || ""; });
       }
 
       var listasRes = await sb.from("priorizacion_listas").select("secretaria_id, status, enviado_at");
@@ -3001,7 +3004,7 @@
       (listasRes.data || []).forEach(function(l){ listaBySec[l.secretaria_id] = l; });
 
       var headers = [
-        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Foto",
+        "Secretaría","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Observaciones","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
         "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
@@ -3030,6 +3033,7 @@
           i.identificacion_tercero || "",
           i.nombre_tercero || "",
           ppByItemX[i.id] || "",
+          obsByItemX[i.id] || "",
           i.foto_url || "",
           i.actividad || "",
           i.objeto || "",
@@ -3246,6 +3250,7 @@
       document.getElementById("totalHint").textContent = "Ingrese el valor total proyectado del contrato.";
     }
     renderIndicadorChosen();
+    if (fuentesDraft.length === 1) renderFuentesChosen();
   }
 
   ["input","change"].forEach(function(evt){
@@ -3253,20 +3258,25 @@
     f.fin.addEventListener(evt, updateDiasYTotal);
     f.tipo.addEventListener(evt, updateDiasYTotal);
     f.honorarios.addEventListener(evt, updateDiasYTotal);
-    f.total.addEventListener(evt, function(){ updateIndicadorTotalsOnly(); });
+    f.total.addEventListener(evt, function(){ updateIndicadorTotalsOnly(); if (fuentesDraft.length === 1) renderFuentesChosen(); });
   });
 
   // Fuentes de financiación (selección + valor opcional por fuente, sin validar contra ningún total)
   function renderFuentesChosen(){
     var el = document.getElementById("fuentesList");
     el.innerHTML = "";
+    var unica = fuentesDraft.length === 1;
+    if (unica){
+      var totUnico = Number(onlyDigits(f.total.value)) || 0;
+      fuentesDraft[0].valor = totUnico ? String(totUnico) : "";
+    }
     fuentesDraft.forEach(function(row, idx){
       var div = document.createElement("div");
       div.className = "fuente-row";
       var valVal = row.valor === "" || row.valor === null || row.valor === undefined ? "" : row.valor;
       div.innerHTML =
         '<span title="' + escapeHtml(labelFromOptions(FUENTES_OPTIONS, row.nombre)) + '">' + escapeHtml(row.nombre) + '</span>' +
-        '<input type="text" inputmode="numeric" placeholder="Valor (opcional)" value="' + escapeHtml(String(valVal)) + '" data-fuente-valor-idx="' + idx + '">' +
+        '<input type="text" inputmode="numeric" placeholder="' + (unica ? "Total del contrato" : "Valor (opcional)") + '" value="' + escapeHtml(unica && valVal !== "" ? Number(valVal).toLocaleString("es-CO") : String(valVal)) + '" data-fuente-valor-idx="' + idx + '"' + (unica ? ' readonly style="background:var(--navy-050);"' : '') + '>' +
         '<button type="button" data-remove-fuente="' + idx + '">×</button>';
       el.appendChild(div);
     });
@@ -3286,6 +3296,7 @@
   f.fuente.addEventListener("change", function(){
     var val = f.fuente.value;
     if (val && !fuentesDraft.some(function(r){ return r.nombre === val; })){
+      if (fuentesDraft.length === 1) fuentesDraft[0].valor = "";  // al pasar a varias fuentes, el valor de cada una se escribe manualmente
       fuentesDraft.push({ nombre: val, valor: "" });
       renderFuentesChosen();
     }
@@ -3465,7 +3476,9 @@
     var ppVer = profile && (profile.role === "admin" || profile.role === "alcalde");
     document.getElementById("ppWrap").style.display = ppVer ? "block" : "none";
     document.getElementById("f_pp").value = item ? item.pp || "" : "";
+    document.getElementById("f_obs").value = item ? item.observaciones || "" : "";
     document.getElementById("f_pp").disabled = !(profile && profile.role === "admin");
+    document.getElementById("f_obs").disabled = !(profile && profile.role === "admin");
     f.actividad.value = item ? item.actividad || "" : "";
     f.servicio.value = item ? item.servicioContratar || "" : "";
     f.objeto.value = item ? item.objeto || "" : "";
@@ -3685,17 +3698,18 @@
     }
     if (profile.role === "admin"){
       var ppNuevo = document.getElementById("f_pp").value.trim();
+      var obsNuevo = document.getElementById("f_obs").value.trim();
       var itemIdPP = editingId || (typeof res.data === "string" ? res.data : (res.data && (res.data.id || res.data.item_id)) || null);
       if (itemIdPP){
-        var ppPrev = (state.items.find(function(i){ return i.id === itemIdPP; }) || {}).pp || "";
-        if (ppNuevo !== ppPrev){
-          var ppRes = ppNuevo
-            ? await sb.from("priorizacion_pp").upsert({ item_id: itemIdPP, pp: ppNuevo, updated_by: profile.id, updated_at: new Date().toISOString() })
+        var prev = state.items.find(function(i){ return i.id === itemIdPP; }) || {};
+        if (ppNuevo !== (prev.pp || "") || obsNuevo !== (prev.observaciones || "")){
+          var ppRes = (ppNuevo || obsNuevo)
+            ? await sb.from("priorizacion_pp").upsert({ item_id: itemIdPP, pp: ppNuevo, observaciones: obsNuevo, updated_by: profile.id, updated_at: new Date().toISOString() })
             : await sb.from("priorizacion_pp").delete().eq("item_id", itemIdPP);
-          if (ppRes.error) alert("La necesidad se guardó, pero no se pudo guardar el PP: " + ppRes.error.message);
+          if (ppRes.error) alert("La necesidad se guardó, pero no se pudo guardar el PP / observaciones: " + ppRes.error.message);
         }
-      } else if (ppNuevo){
-        alert("La necesidad se guardó, pero no se pudo asociar el PP. Ábrala de nuevo y escriba el PP.");
+      } else if (ppNuevo || obsNuevo){
+        alert("La necesidad se guardó, pero no se pudo asociar el PP / observaciones. Ábrala de nuevo y escríbalos.");
       }
     }
     closeModal();
