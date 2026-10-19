@@ -495,7 +495,7 @@
     <div class="pres-section-title">Resumen general del presupuesto</div>
     <div class="pres-grid3">
       <div class="pres-box readonly">
-        <label>Funcionamiento</label>
+        <label>Funcionamiento (entidades + necesidades de contratación)</label>
         <div class="val" id="presResFuncionamiento">$0</div>
       </div>
       <div class="pres-box readonly" id="presServicioDeudaBox">
@@ -2317,7 +2317,7 @@
     if (document.activeElement !== inpIngresos) inpIngresos.value = (totalIngresosCfg !== null) ? totalIngresosCfg.toLocaleString("es-CO") : "";
 
     var tot = renderFuncionamiento(cfg.funcionamiento, esAdmin);
-    var totalFuncPres = tot.func, servicioDeuda = tot.deuda;
+    var totalFuncPres = tot.func + totalFuncionamiento, servicioDeuda = tot.deuda;  // entidades + necesidades de contratación de funcionamiento
     document.getElementById("presResFuncionamiento").textContent = fmtCOP(totalFuncPres);
     document.getElementById("presServicioDeuda").textContent = fmtCOP(servicioDeuda);
     var totalGastos = totalFuncPres + servicioDeuda + totalInversion;
