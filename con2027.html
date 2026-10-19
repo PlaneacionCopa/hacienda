@@ -2257,10 +2257,20 @@
     Object.keys(funcAuto).forEach(function(k){ idsAuto = idsAuto.concat(funcAuto[k].ids); });
     if (idsAuto.length){
       var faRes = await sb.from("priorizacion_fuentes").select("item_id, nombre, valor").in("item_id", idsAuto);
-      (faRes.data || []).forEach(function(r){
-        Object.keys(funcAuto).forEach(function(k){
-          if (funcAuto[k].ids.indexOf(r.item_id) < 0) return;
-          funcAuto[k].fuentes[r.nombre] = (funcAuto[k].fuentes[r.nombre] || 0) + Number(r.valor || 0);
+      var porItem = {};
+      (faRes.data || []).forEach(function(r){ (porItem[r.item_id] = porItem[r.item_id] || []).push(r); });
+      var totItem = {};
+      items.forEach(function(i){ totItem[i.id] = Number(i.total || 0); });
+      Object.keys(funcAuto).forEach(function(k){
+        funcAuto[k].ids.forEach(function(id){
+          var fs = porItem[id] || [];
+          if (fs.length === 1){
+            // una sola fuente: se le atribuye el total de la necesidad
+            var nm = fs[0].nombre;
+            funcAuto[k].fuentes[nm] = (funcAuto[k].fuentes[nm] || 0) + totItem[id];
+          } else {
+            fs.forEach(function(r){ funcAuto[k].fuentes[r.nombre] = (funcAuto[k].fuentes[r.nombre] || 0) + Number(r.valor || 0); });
+          }
         });
       });
     }
