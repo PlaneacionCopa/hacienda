@@ -1781,6 +1781,7 @@
       return {
         id: i.id,
         numero: i.numero,
+        secOriginalId: i.secretaria_original_id || "",
         pp: ppByItem[i.id] || "",
         observaciones: obsByItem[i.id] || "",
         identificacionTercero: i.identificacion_tercero,
@@ -1902,6 +1903,7 @@
           '<span class="tag">' + escapeHtml(tipoLabel(item.tipoContrato)) + '</span>' +
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
+          ((currentSecretariaId === "oculto" || currentSecretariaId === "eliminado") && item.secOriginalId ? '<span class="tag" style="background:#e8eefc;color:#1e3a8a;font-weight:700;">' + escapeHtml((secretariasCatalog.filter(function(s){return s.id===item.secOriginalId;})[0] || {}).nombre || item.secOriginalId) + '</span>' : '') +
           (item.pp ? '<span class="tag" style="background:#fff7e6;color:#b45309;">PP: ' + escapeHtml(item.pp) + '</span>' : '') +
           (item.observaciones ? '<span class="tag" style="background:#eef7ee;color:#166534;">Observaciones: ' + escapeHtml(item.observaciones) + '</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
