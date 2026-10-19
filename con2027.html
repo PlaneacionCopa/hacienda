@@ -2240,7 +2240,7 @@
     var cfgRes = await sb.from("presupuesto_config").select("*").eq("id", "singleton").maybeSingle();
     var cfg = cfgRes.data || { total_presupuesto_ingresos: null, servicio_deuda: 0 };
 
-    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total").eq("eliminado", false);
+    var itemsRes = await sb.from("priorizacion_items").select("id, tipo_necesidad, total, secretaria_id").eq("eliminado", false);
     var items = itemsRes.data || [];
     var idsInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; }).map(function(i){ return i.id; });
     var totalFuncionamiento = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento"; })
@@ -2248,6 +2248,11 @@
     var totalInversion = items.filter(function(i){ return i.tipo_necesidad !== "funcionamiento"; })
       .reduce(function(s,i){ return s + Number(i.total||0); }, 0);
 
+    funcAuto = {};
+    ["inder", "invicop"].forEach(function(sid){
+      var its = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento" && i.secretaria_id === sid; });
+      funcAuto[sid] = { total: its.reduce(function(s,i){ return s + Number(i.total||0); }, 0), n: its.length };
+    });
     var gastoPorFuente = {};
     var gastoNombre = {};
     // Clave de fuente: el código (ej. 23005) si lo tiene; si no, el nombre sin tildes/espacios dobles.
@@ -2341,14 +2346,15 @@
   // ---------- Funcionamiento por entidad (fuentes manuales; el total es la suma de las fuentes) ----------
   var FUNC_ENTIDADES = [
     { id: "adm_central", nombre: "Administración central", grupos: [{ key: "honorarios", label: "Honorarios" }, { key: "otros", label: "Otros gastos" }] },
-    { id: "inder", nombre: "INDER", grupos: [{ key: "honorarios", label: "Honorarios" }, { key: "otros", label: "Otros gastos" }] },
-    { id: "invicop", nombre: "INVICOP", grupos: [{ key: "honorarios", label: "Honorarios" }, { key: "otros", label: "Otros gastos" }] },
+    { id: "inder", nombre: "INDER", grupos: [{ key: "personal", label: "Gastos de personal" }, { key: "honorarios", label: "Honorarios", auto: true }, { key: "otros", label: "Otros gastos" }] },
+    { id: "invicop", nombre: "INVICOP", grupos: [{ key: "personal", label: "Gastos de personal" }, { key: "honorarios", label: "Honorarios", auto: true }, { key: "otros", label: "Otros gastos" }] },
     { id: "concejo", nombre: "Concejo", grupos: [{ key: "fuentes", label: "" }] },
     { id: "personeria", nombre: "Personería", grupos: [{ key: "fuentes", label: "" }] },
     { id: "fondo_salud", nombre: "Fondo local de salud", grupos: [{ key: "fuentes", label: "" }] },
     { id: "deuda", nombre: "Servicio de la deuda", deuda: true, grupos: [{ key: "capital", label: "Capital" }, { key: "intereses", label: "Intereses" }, { key: "contingencias", label: "Fondo de contingencias" }] }
   ];
   var funcState = {};
+  var funcAuto = {}; // honorarios automáticos (necesidades de funcionamiento) por entidad: { inder: {total,n}, ... }
 
   function normFuentes(arr){
     return Array.isArray(arr) ? arr.map(function(x){ return { nombre: x.nombre, valor: Number(x.valor) || 0 }; }) : [];
@@ -2387,10 +2393,14 @@
       var totalEnt = 0;
       var grupos = en.grupos.map(function(g){
         var arr = funcState[en.id][g.key];
-        var sub = sumFuentes(arr);
+        var auto = g.auto ? (funcAuto[en.id] || { total: 0, n: 0 }) : null;
+        var sub = auto ? auto.total : sumFuentes(arr);
         totalEnt += sub;
         var h = '<div data-grp="' + g.key + '" style="margin-top:.4rem;">';
         if (g.label) h += '<div class="func-head" style="margin-bottom:.1rem;"><span class="section-label">' + g.label + '</span><span class="func-total">' + fmtCOP(sub) + '</span></div>';
+        if (auto){
+          return h + '<div class="func-row"><span>Necesidades de funcionamiento cargadas por la secretaría (' + auto.n + ')</span><span class="num">' + fmtCOP(sub) + '</span><span></span></div></div>';
+        }
         h += arr.map(function(x, idx){
           return '<div class="func-row"><span>' + escapeHtml(x.nombre) + '</span><span class="num">' + fmtCOP(x.valor) + '</span>' +
             (esAdmin ? '<button type="button" data-del="' + idx + '">×</button>' : '<span></span>') + '</div>';
@@ -2403,7 +2413,8 @@
         }
         return h + '</div>';
       }).join("");
-      if (en.deuda) totalDeudaGen += totalEnt; else totalGeneral += totalEnt;
+      var totalAuto = en.grupos.reduce(function(s,g){ return s + (g.auto ? (funcAuto[en.id] || { total: 0 }).total : 0); }, 0);
+      if (en.deuda) totalDeudaGen += totalEnt; else totalGeneral += totalEnt - totalAuto;
       return '<div class="func-block" data-ent="' + en.id + '"><div class="func-head"><h4>' + en.nombre + '</h4>' +
         '<span class="func-total">Total: ' + fmtCOP(totalEnt) + '</span></div>' + grupos + '</div>';
     }).join("");
@@ -2420,7 +2431,8 @@
               if (await saveFuncionamiento()) await renderPresupuestoPanel();
             });
           });
-          grp.querySelector("[data-add]").addEventListener("click", async function(){
+          var addBtn = grp.querySelector("[data-add]"); if (!addBtn) return;
+          addBtn.addEventListener("click", async function(){
             var nombre = grp.querySelector("[data-fsel]").value;
             var valor = Number(onlyDigits(grp.querySelector("[data-fval]").value)) || 0;
             if (!nombre || valor <= 0){ alert("Seleccione una fuente e ingrese un valor mayor a 0."); return; }
