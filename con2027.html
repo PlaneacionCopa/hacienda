@@ -2249,10 +2249,20 @@
       .reduce(function(s,i){ return s + Number(i.total||0); }, 0);
 
     var gastoPorFuente = {};
+    var gastoNombre = {};
+    // Clave de fuente: el código (ej. 23005) si lo tiene; si no, el nombre sin tildes/espacios dobles.
+    // Así "Régimen" y "Regimén" (o espacios de más) cuentan como la misma fuente.
+    function fkey(n){
+      var s = String(n || "").trim();
+      var m = s.match(/^([0-9][0-9.]*)\s*-/);
+      if (m) return m[1];
+      return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toLowerCase();
+    }
     if (idsInversion.length){
       var fiRes = await sb.from("priorizacion_fuentes").select("nombre, valor").in("item_id", idsInversion);
       (fiRes.data || []).forEach(function(r){
-        gastoPorFuente[r.nombre] = (gastoPorFuente[r.nombre] || 0) + Number(r.valor || 0);
+        var k = fkey(r.nombre); if (!gastoNombre[k]) gastoNombre[k] = r.nombre;
+        gastoPorFuente[k] = (gastoPorFuente[k] || 0) + Number(r.valor || 0);
       });
     }
 
@@ -2261,7 +2271,8 @@
     FUNC_ENTIDADES.forEach(function(en){
       en.grupos.forEach(function(g){
         funcNorm[en.id][g.key].forEach(function(x){
-          gastoPorFuente[x.nombre] = (gastoPorFuente[x.nombre] || 0) + x.valor;
+          var k = fkey(x.nombre); if (!gastoNombre[k]) gastoNombre[k] = x.nombre;
+          gastoPorFuente[k] = (gastoPorFuente[k] || 0) + x.valor;
         });
       });
     });
@@ -2273,8 +2284,8 @@
     var sumIngreso = 0, sumGasto = 0;
     fuentesIngresos.forEach(function(fu){
       var ingreso = Number(fu.valor || 0);
-      var gasto = gastoPorFuente[fu.nombre_fuente] || 0;
-      nombresUsados[fu.nombre_fuente] = true;
+      var gasto = gastoPorFuente[fkey(fu.nombre_fuente)] || 0;
+      nombresUsados[fkey(fu.nombre_fuente)] = true;
       var dif = ingreso - gasto;
       sumIngreso += ingreso; sumGasto += gasto;
       filasHtml += '<div class="pres-row"><div>' + escapeHtml(fu.nombre_fuente) + '</div>' +
@@ -2283,9 +2294,10 @@
         '<div class="num ' + (dif < 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(dif) + '</div></div>';
     });
     // Fuentes que las secretarías usaron en sus necesidades pero que no aparecen en el CSV de ingresos cargado
-    Object.keys(gastoPorFuente).forEach(function(nombre){
-      if (nombresUsados[nombre]) return;
-      var gasto = gastoPorFuente[nombre];
+    Object.keys(gastoPorFuente).forEach(function(k){
+      if (nombresUsados[k]) return;
+      var nombre = gastoNombre[k] || k;
+      var gasto = gastoPorFuente[k];
       if (!gasto) return;
       sumGasto += gasto;
       filasHtml += '<div class="pres-row"><div>' + escapeHtml(nombre) + ' <span class="tag" style="margin-left:.3rem;">sin ingreso cargado</span></div>' +
