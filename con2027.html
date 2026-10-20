@@ -1739,7 +1739,7 @@
     fillSelect(els.secretariaSelect, catalogoVisible.map(function(s){ return {v:s.id, l:s.nombre}; }), null);
     if (profile.role === "admin"){
       els.secretariaSelect.disabled = false;
-      els.secretariaNote.textContent = "Como administrador puedes ver y editar la lista de cualquier secretaría. Selecciona \"O\" para ver las necesidades ocultas y \"E\" para las eliminadas.";
+      els.secretariaNote.textContent = "";
     } else {
       els.secretariaSelect.disabled = true;
       els.secretariaNote.textContent = "Tu secretaría queda fija según tu usuario.";
@@ -3192,7 +3192,7 @@
         "Secretaría","N°","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Observaciones","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
-        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación","Subcuenta",
+        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","@@FUENTES@@","Subcuenta",
         "Link SECOP contrato actual","Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
       ];
 
@@ -3237,7 +3237,7 @@
           Number(i.total) || 0,
           vigenciaTxt,
           vigenciaDetalle,
-          fuentesTxt,
+          "@@FUENTES@@",
           i.subcuenta || "",
           i.link_secop || "",
           i.justificacion_tecnica || "",
@@ -3246,6 +3246,26 @@
           i.created_at ? new Date(i.created_at).toLocaleString("es-CO") : ""
         ];
       }
+
+      // Fuentes de financiación: una columna para la fuente y otra para su valor, repetidas según el máximo de fuentes
+      var idxF = headers.indexOf("@@FUENTES@@");
+      var maxF = 1;
+      items.concat(ocultos).forEach(function(i){ maxF = Math.max(maxF, (fuentesByItem[i.id] || []).length); });
+      var hdrF = [];
+      for (var q = 1; q <= maxF; q++){ hdrF.push("Fuente de financiación " + q, "Valor fuente " + q); }
+      headers.splice.apply(headers, [idxF, 1].concat(hdrF));
+      var filaBase = filaDe;
+      filaDe = function(i){
+        var r = filaBase(i);
+        var fs = fuentesByItem[i.id] || [];
+        var cells = [];
+        for (var q = 0; q < maxF; q++){
+          var fu = fs[q];
+          cells.push(fu ? fu.nombre : "", fu ? (fs.length === 1 ? (Number(i.total) || 0) : (Number(fu.valor) || 0)) : "");
+        }
+        r.splice.apply(r, [idxF, 1].concat(cells));
+        return r;
+      };
 
       var rows = items.map(filaDe);
       var wsData = [headers].concat(rows);
