@@ -2359,12 +2359,14 @@
     var nombresUsados = {};
     var filasHtml = "";
     var sumIngreso = 0, sumGasto = 0;
+    var presRows = [];
     fuentesIngresos.forEach(function(fu){
       var ingreso = Number(fu.valor || 0);
       var gasto = gastoPorFuente[fkey(fu.nombre_fuente)] || 0;
       nombresUsados[fkey(fu.nombre_fuente)] = true;
       var dif = ingreso - gasto;
       sumIngreso += ingreso; sumGasto += gasto;
+      presRows.push([fu.nombre_fuente, ingreso, gasto, dif]);
       filasHtml += '<div class="pres-row"><div>' + escapeHtml(fu.nombre_fuente) + '</div>' +
         '<div class="num">' + fmtCOP(ingreso) + '</div>' +
         '<div class="num">' + fmtCOP(gasto) + '</div>' +
@@ -2377,6 +2379,7 @@
       var gasto = gastoPorFuente[k];
       if (!gasto) return;
       sumGasto += gasto;
+      presRows.push([nombre + " (sin ingreso cargado)", 0, gasto, -gasto]);
       filasHtml += '<div class="pres-row"><div>' + escapeHtml(nombre) + ' <span class="tag" style="margin-left:.3rem;">sin ingreso cargado</span></div>' +
         '<div class="num">' + fmtCOP(0) + '</div>' +
         '<div class="num">' + fmtCOP(gasto) + '</div>' +
@@ -2385,11 +2388,15 @@
 
     if (Math.abs(sinFuente) > 0){
       sumGasto += sinFuente;
+      presRows.push(["Sin fuente asignada", 0, sinFuente, -sinFuente]);
       filasHtml += '<div class="pres-row"><div>Sin fuente asignada <span class="tag" style="margin-left:.3rem;">necesidades sin fuente o con fuentes que no suman su total</span></div>' +
         '<div class="num">' + fmtCOP(0) + '</div>' +
         '<div class="num">' + fmtCOP(sinFuente) + '</div>' +
         '<div class="num ' + (sinFuente > 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(-sinFuente) + '</div></div>';
     }
+
+    presRows.push(["TOTAL", sumIngreso, sumGasto, sumIngreso - sumGasto]);
+    presExport = presRows;
 
     if (!fuentesIngresos.length && !filasHtml){
       tabla.innerHTML = '<p style="padding:.6rem .4rem;color:var(--ink-soft);">Todavía no se ha cargado el CSV de ingresos por fuente de financiación.</p>';
@@ -2434,6 +2441,7 @@
     { id: "deuda", nombre: "Servicio de la deuda", deuda: true, grupos: [{ key: "capital", label: "Capital" }, { key: "intereses", label: "Intereses" }, { key: "contingencias", label: "Fondo de contingencias" }] }
   ];
   var funcState = {};
+  var presExport = null; // filas de la tabla ingresos vs gastos, para el Excel
   var funcAuto = {}; // honorarios automáticos (necesidades de funcionamiento) por entidad: { inder: {total,n}, ... }
 
   function normFuentes(arr){
@@ -3299,6 +3307,63 @@
         var wsOc = XLSX.utils.aoa_to_sheet([headers].concat(rowsOc));
         wsOc["!cols"] = headers.map(function(){ return { wch: 24 }; });
         XLSX.utils.book_append_sheet(wb, wsOc, "Ocultos");
+      }
+
+      // ---- Hojas adicionales: panel de administración, ingresos vs gastos, funcionamiento y servicio de la deuda ----
+      try{
+        await renderPresupuestoPanel(); // asegura datos al día (presExport, funcState, funcAuto)
+        var resRes = await sb.from("priorizacion_resumen").select("*").order("secretaria_nombre");
+        var resData = (resRes.data || []).filter(function(r){ return r.secretaria_id !== "eliminado"; });
+        var aoaRes = [["Secretaría", "Estado de la lista", "N° de necesidades", "Total proyectado"]];
+        var tn = 0, tt = 0;
+        resData.forEach(function(r){
+          aoaRes.push([r.secretaria_nombre, r.status === "enviado" ? "Enviado" : "Borrador", Number(r.total_items) || 0, Number(r.total_proyectado) || 0]);
+          tn += Number(r.total_items) || 0; tt += Number(r.total_proyectado) || 0;
+        });
+        aoaRes.push(["TOTAL", "", tn, tt]);
+        var wsRes = XLSX.utils.aoa_to_sheet(aoaRes);
+        wsRes["!cols"] = [{ wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 22 }];
+        XLSX.utils.book_append_sheet(wb, wsRes, "Panel administración");
+
+        if (presExport){
+          var wsIG = XLSX.utils.aoa_to_sheet([["Fuente de financiación", "Ingreso proyectado", "Gasto proyectado (inversión + funcionamiento)", "Diferencia"]].concat(presExport));
+          wsIG["!cols"] = [{ wch: 55 }, { wch: 22 }, { wch: 30 }, { wch: 22 }];
+          XLSX.utils.book_append_sheet(wb, wsIG, "Ingresos vs gastos");
+        }
+
+        var aoaF = [["Entidad", "Grupo", "Fuente de financiación", "Valor"]];
+        var totFunc = 0, totDeuda = 0;
+        FUNC_ENTIDADES.forEach(function(en){
+          var totEnt = 0;
+          en.grupos.forEach(function(g){
+            var grpTot = 0;
+            if (g.auto){
+              var au = funcAuto[en.id] || { total: 0, fuentes: {} };
+              var conF = 0;
+              Object.keys(au.fuentes || {}).sort().forEach(function(nm){
+                aoaF.push([en.nombre, (g.label || "") + " (necesidades de funcionamiento)", nm, au.fuentes[nm]]); conF += au.fuentes[nm];
+              });
+              if (au.total - conF > 0) aoaF.push([en.nombre, (g.label || "") + " (necesidades de funcionamiento)", "Sin fuente asignada", au.total - conF]);
+              grpTot = au.total;
+            } else {
+              (funcState[en.id][g.key] || []).forEach(function(x){
+                aoaF.push([en.nombre, g.label || "", x.nombre, x.valor]); grpTot += x.valor;
+              });
+            }
+            totEnt += grpTot;
+          });
+          aoaF.push([en.nombre, "TOTAL " + en.nombre, "", totEnt]);
+          aoaF.push(["", "", "", ""]);
+          if (en.deuda) totDeuda += totEnt; else totFunc += totEnt;
+        });
+        aoaF.push(["TOTAL FUNCIONAMIENTO", "", "", totFunc]);
+        aoaF.push(["TOTAL SERVICIO DE LA DEUDA", "", "", totDeuda]);
+        var wsF = XLSX.utils.aoa_to_sheet(aoaF);
+        wsF["!cols"] = [{ wch: 28 }, { wch: 42 }, { wch: 55 }, { wch: 22 }];
+        XLSX.utils.book_append_sheet(wb, wsF, "Funcionamiento y deuda");
+      }catch(errX){
+        console.error(errX);
+        alert("El Excel se generará, pero no se pudieron agregar las hojas de funcionamiento/presupuesto: " + (errX.message || errX));
       }
 
       var fecha = new Date().toISOString().slice(0,10);
