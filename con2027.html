@@ -1416,7 +1416,8 @@
   var SERVICIOS = ["Asistencial","Auxiliar de oficina","Técnico","Tecnólogo","Profesional","Otro"];
 
   var TIPOS_CONTRATO = [
-      {v:"1-prestaciondeservicios", l:"1-Prestación de servicios persona natural o jurídica"},
+      {v:"1-prestaciondeservicios", l:"1-Prestación de servicios persona natural"},
+      {v:"1-prestaciondeserviciosjuridica", l:"1-Prestación de servicios persona jurídica"},
       {v:"2-suministros", l:"2-Suministro"},
       {v:"3-compraventa", l:"3-Compraventa"},
       {v:"4-arrendamiento", l:"4-Arrendamiento"},
@@ -1789,7 +1790,7 @@
       var ocRes = await sb.from("priorizacion_items").select("total, tipo_contrato").eq("secretaria_original_id", currentSecretariaId).eq("oculto", true).eq("eliminado", false);
       (ocRes.data || []).forEach(function(o){
         state.ocultosExtra.n++; state.ocultosExtra.total += Number(o.total) || 0;
-        if (o.tipo_contrato === "1-prestaciondeservicios") state.ocultosExtra.ps++;
+        if (esPS(o.tipo_contrato)) state.ocultosExtra.ps++;
       });
     }
     state.items = rawItems.map(function(i){
@@ -1890,9 +1891,10 @@
     els.statCount.textContent = state.items.length + ex.n;
     var total = state.items.reduce(function(s,i){ return s + (Number(i.total)||0); },0) + ex.total;
     els.statTotal.textContent = fmtCOP(total);
-    els.statPS.textContent = state.items.filter(function(i){ return i.tipoContrato === "1-prestaciondeservicios"; }).length + ex.ps;
+    els.statPS.textContent = state.items.filter(function(i){ return esPS(i.tipoContrato); }).length + ex.ps;
   }
 
+  function esPS(v){ return v === "1-prestaciondeservicios" || v === "1-prestaciondeserviciosjuridica"; }
   function fuenteCodigo(nombre){
     var m = String(nombre || "").trim().match(/^([0-9][0-9.]*)\s*-/);
     return m ? m[1] : String(nombre || "").trim();
@@ -2313,13 +2315,24 @@
       if (m) return m[1];
       return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").toLowerCase();
     }
-    if (idsInversion.length){
-      var fiRes = await sb.from("priorizacion_fuentes").select("nombre, valor").in("item_id", idsInversion);
-      (fiRes.data || []).forEach(function(r){
-        var k = fkey(r.nombre); if (!gastoNombre[k]) gastoNombre[k] = r.nombre;
-        gastoPorFuente[k] = (gastoPorFuente[k] || 0) + Number(r.valor || 0);
-      });
+    // Gasto por fuente: fuentes de TODAS las necesidades (inversión y funcionamiento).
+    // Con una sola fuente se atribuye el total de la necesidad.
+    var idsTodas = items.map(function(i){ return i.id; });
+    var totPorItem = {};
+    items.forEach(function(i){ totPorItem[i.id] = Number(i.total || 0); });
+    var fuentesPorItem = {};
+    for (var ch = 0; ch < idsTodas.length; ch += 200){
+      var fiRes = await sb.from("priorizacion_fuentes").select("item_id, nombre, valor").in("item_id", idsTodas.slice(ch, ch + 200));
+      (fiRes.data || []).forEach(function(r){ (fuentesPorItem[r.item_id] = fuentesPorItem[r.item_id] || []).push(r); });
     }
+    Object.keys(fuentesPorItem).forEach(function(id){
+      var fs = fuentesPorItem[id];
+      fs.forEach(function(r){
+        var k = fkey(r.nombre); if (!gastoNombre[k]) gastoNombre[k] = r.nombre;
+        var v = fs.length === 1 ? totPorItem[id] : Number(r.valor || 0);
+        gastoPorFuente[k] = (gastoPorFuente[k] || 0) + (v || 0);
+      });
+    });
 
     // Funcionamiento por fuente (suma de las fuentes agregadas en cada entidad) se suma al gasto de la fuente
     var funcNorm = normFunc(cfg.funcionamiento);
@@ -2329,14 +2342,6 @@
           var k = fkey(x.nombre); if (!gastoNombre[k]) gastoNombre[k] = x.nombre;
           gastoPorFuente[k] = (gastoPorFuente[k] || 0) + x.valor;
         });
-      });
-    });
-
-    // Honorarios de INDER/INVICOP (necesidades de funcionamiento) por fuente
-    Object.keys(funcAuto).forEach(function(k){
-      Object.keys(funcAuto[k].fuentes).forEach(function(nombre){
-        var kk = fkey(nombre); if (!gastoNombre[kk]) gastoNombre[kk] = nombre;
-        gastoPorFuente[kk] = (gastoPorFuente[kk] || 0) + funcAuto[k].fuentes[nombre];
       });
     });
 
@@ -3416,7 +3421,7 @@
   function updateDiasYTotal(){
     var dias = calcDiasInclusive(f.inicio.value, f.fin.value);
     f.dias.value = dias ? (dias + " días") : "0 días";
-    var esPrestacion = f.tipo.value === "1-prestaciondeservicios";
+    var esPrestacion = esPS(f.tipo.value);
     document.getElementById("honorariosRow").style.opacity = esPrestacion ? "1" : ".55";
     f.honorarios.disabled = !esPrestacion;
 
@@ -3789,7 +3794,7 @@
     var totalVal = Number(onlyDigits(f.total.value)) || 0;
     if (totalVal === 0){
       valid = false;
-      alert("Ingrese el total proyectado del contrato" + (f.tipo.value !== "1-prestaciondeservicios" ? " (obligatorio cuando el tipo de contrato no es prestación de servicios)." : "."));
+      alert("Ingrese el total proyectado del contrato" + (!esPS(f.tipo.value) ? " (obligatorio cuando el tipo de contrato no es prestación de servicios)." : "."));
     } else if (fuentesDraft.length === 0){
       valid = false;
       alert("Seleccione al menos una fuente de financiación.");
