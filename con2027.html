@@ -2334,6 +2334,15 @@
       });
     });
 
+    // Lo que las necesidades no asignaron a ninguna fuente (sin fuentes, o varias fuentes que no suman el total)
+    var sinFuente = 0;
+    items.forEach(function(i){
+      var fs = fuentesPorItem[i.id] || [];
+      if (fs.length === 1) return;
+      var asignado = fs.reduce(function(s, r){ return s + Number(r.valor || 0); }, 0);
+      sinFuente += (totPorItem[i.id] || 0) - asignado;
+    });
+
     // Funcionamiento por fuente (suma de las fuentes agregadas en cada entidad) se suma al gasto de la fuente
     var funcNorm = normFunc(cfg.funcionamiento);
     FUNC_ENTIDADES.forEach(function(en){
@@ -2373,6 +2382,14 @@
         '<div class="num">' + fmtCOP(gasto) + '</div>' +
         '<div class="num pres-diff-neg">' + fmtCOP(-gasto) + '</div></div>';
     });
+
+    if (Math.abs(sinFuente) > 0){
+      sumGasto += sinFuente;
+      filasHtml += '<div class="pres-row"><div>Sin fuente asignada <span class="tag" style="margin-left:.3rem;">necesidades sin fuente o con fuentes que no suman su total</span></div>' +
+        '<div class="num">' + fmtCOP(0) + '</div>' +
+        '<div class="num">' + fmtCOP(sinFuente) + '</div>' +
+        '<div class="num ' + (sinFuente > 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(-sinFuente) + '</div></div>';
+    }
 
     if (!fuentesIngresos.length && !filasHtml){
       tabla.innerHTML = '<p style="padding:.6rem .4rem;color:var(--ink-soft);">Todavía no se ha cargado el CSV de ingresos por fuente de financiación.</p>';
