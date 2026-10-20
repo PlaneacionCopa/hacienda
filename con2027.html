@@ -221,6 +221,7 @@
     border-radius:8px;padding:.4rem .6rem;
   }
   .fuente-row input{padding:.35rem .5rem;font-size:.8rem;}
+  .fuente-row select{padding:.35rem .5rem;font-size:.8rem;min-width:0;}
 
   .vf-add-row{display:grid;grid-template-columns:1fr 160px auto;gap:.5rem;align-items:end;}
   .vf-row{
@@ -933,6 +934,11 @@
           <div class="vf-summary" id="vfSummary"></div>
           <div class="error-text" id="err_vigencia"></div>
         </div>
+      </div>
+
+      <div class="field" id="subcuentaWrap" style="display:none;">
+        <div class="section-label">Subcuenta (Salud)</div>
+        <select id="f_subcuenta" style="margin-top:.6rem;"></select>
       </div>
 
       <div>
@@ -1777,10 +1783,20 @@
       (ppRes.data || []).forEach(function(r){ ppByItem[r.item_id] = r.pp || ""; obsByItem[r.item_id] = r.observaciones || ""; });
     }
 
+    // Ocultas (O) cuyo origen es esta secretaría: siguen sumando en sus estadísticas (no se listan aquí ni se duplican en inversión)
+    state.ocultosExtra = { n: 0, total: 0, ps: 0 };
+    if (profile && profile.role === "admin" && currentSecretariaId !== "oculto" && currentSecretariaId !== "eliminado"){
+      var ocRes = await sb.from("priorizacion_items").select("total, tipo_contrato").eq("secretaria_original_id", currentSecretariaId).eq("oculto", true).eq("eliminado", false);
+      (ocRes.data || []).forEach(function(o){
+        state.ocultosExtra.n++; state.ocultosExtra.total += Number(o.total) || 0;
+        if (o.tipo_contrato === "1-prestaciondeservicios") state.ocultosExtra.ps++;
+      });
+    }
     state.items = rawItems.map(function(i){
       return {
         id: i.id,
         numero: i.numero,
+        subcuenta: i.subcuenta || "",
         secOriginalId: i.secretaria_original_id || "",
         pp: ppByItem[i.id] || "",
         observaciones: obsByItem[i.id] || "",
@@ -1870,11 +1886,23 @@
   }
 
   function renderStats(){
-    els.statCount.textContent = state.items.length;
-    var total = state.items.reduce(function(s,i){ return s + (Number(i.total)||0); },0);
+    var ex = state.ocultosExtra || { n: 0, total: 0, ps: 0 };
+    els.statCount.textContent = state.items.length + ex.n;
+    var total = state.items.reduce(function(s,i){ return s + (Number(i.total)||0); },0) + ex.total;
     els.statTotal.textContent = fmtCOP(total);
-    els.statPS.textContent = state.items.filter(function(i){ return i.tipoContrato === "1-prestaciondeservicios"; }).length;
+    els.statPS.textContent = state.items.filter(function(i){ return i.tipoContrato === "1-prestaciondeservicios"; }).length + ex.ps;
   }
+
+  function fuenteCodigo(nombre){
+    var m = String(nombre || "").trim().match(/^([0-9][0-9.]*)\s*-/);
+    return m ? m[1] : String(nombre || "").trim();
+  }
+  function fuentesCodigos(arr){
+    var cods = (arr || []).map(function(x){ return fuenteCodigo(x.nombre); }).filter(Boolean);
+    return cods.length ? cods.join(", ") : "—";
+  }
+  // Subcuentas del Fondo Local de Salud (solo se usan en la secretaría de Salud)
+  var SALUD_SUBCUENTAS = ["Régimen subsidiado", "Salud pública", "Prestación de servicios (oferta)", "Otros gastos en salud"];
 
   function renderItems(){
     els.itemsList.innerHTML = "";
@@ -1904,6 +1932,7 @@
           (item.actividad ? '<span class="tag">' + escapeHtml(item.actividad) + '</span>' : '') +
           (item.nombreTercero ? '<span class="tag">' + escapeHtml(item.nombreTercero) + '</span>' : '') +
           ((currentSecretariaId === "oculto" || currentSecretariaId === "eliminado") && item.secOriginalId ? '<span class="tag" style="background:#e8eefc;color:#1e3a8a;font-weight:700;">' + escapeHtml((secretariasCatalog.filter(function(s){return s.id===item.secOriginalId;})[0] || {}).nombre || item.secOriginalId) + '</span>' : '') +
+          (item.subcuenta ? '<span class="tag" style="background:#e6f7f1;color:#065f46;font-weight:700;">Subcuenta: ' + escapeHtml(item.subcuenta) + '</span>' : '') +
           (item.pp ? '<span class="tag" style="background:#fff7e6;color:#b45309;">PP: ' + escapeHtml(item.pp) + '</span>' : '') +
           (item.observaciones ? '<span class="tag" style="background:#eef7ee;color:#166534;">Observaciones: ' + escapeHtml(item.observaciones) + '</span>' : '') +
           (item.tipoNecesidad !== "funcionamiento" ? '<span class="tag">' + (item.bpin ? item.bpin.length : 0) + ' BPIN</span>' : '') +
@@ -1967,7 +1996,7 @@
       var dias = calcDiasInclusive(item.fechaInicio, item.fechaFin);
       bottom.innerHTML =
         '<span>' + (item.fechaInicio || "—") + ' → ' + (item.fechaFin || "—") + ' (' + dias + ' días)</span>' +
-        '<span>Fuentes: ' + (item.fuentes ? item.fuentes.length : 0) + '</span>' +
+        '<span>' + ((item.fuentes && item.fuentes.length > 1) ? "Fuentes: " : "Fuente: ") + escapeHtml(fuentesCodigos(item.fuentes)) + '</span>' +
         '<span class="total">' + fmtCOP(item.total) + '</span>';
 
       card.appendChild(top);
@@ -3158,7 +3187,7 @@
         "Secretaría","N°","Estado de la lista","Tipo de necesidad","Identificación tercero","Nombre tercero","PP","Observaciones","Foto",
         "Actividad","Objeto","Servicio a contratar","BPIN","Indicadores (código: %)","Tipo de contrato",
         "Modalidad de selección","Forma de pago","Fecha inicio","Fecha fin","Duración (días)",
-        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación",
+        "Honorarios mensuales","Valor honorarios 2026","Total proyectado","¿Vigencia futura?","Vigencia futura - detalle","Fuentes de financiación","Subcuenta",
         "Link SECOP contrato actual","Justificación técnica","Justificación jurídica","Artículo de ley","Fecha de registro"
       ];
 
@@ -3204,6 +3233,7 @@
           vigenciaTxt,
           vigenciaDetalle,
           fuentesTxt,
+          i.subcuenta || "",
           i.link_secop || "",
           i.justificacion_tecnica || "",
           i.justificacion_juridica || "",
@@ -3427,10 +3457,26 @@
       div.className = "fuente-row";
       var valVal = row.valor === "" || row.valor === null || row.valor === undefined ? "" : row.valor;
       div.innerHTML =
-        '<span title="' + escapeHtml(labelFromOptions(FUENTES_OPTIONS, row.nombre)) + '">' + escapeHtml(row.nombre) + '</span>' +
+        '<select data-fuente-nombre-idx="' + idx + '" title="Cambiar fuente">' +
+          (FUENTES_OPTIONS.indexOf(row.nombre) < 0 ? '<option value="' + escapeHtml(row.nombre) + '">' + escapeHtml(row.nombre) + '</option>' : '') +
+          FUENTES_OPTIONS.map(function(n){ return '<option value="' + escapeHtml(n) + '"' + (n === row.nombre ? " selected" : "") + '>' + escapeHtml(n) + '</option>'; }).join("") +
+        '</select>' +
         '<input type="text" inputmode="numeric" placeholder="' + (unica ? "Total del contrato" : "Valor (opcional)") + '" value="' + escapeHtml(unica && valVal !== "" ? Number(valVal).toLocaleString("es-CO") : String(valVal)) + '" data-fuente-valor-idx="' + idx + '"' + (unica ? ' readonly style="background:var(--navy-050);"' : '') + '>' +
         '<button type="button" data-remove-fuente="' + idx + '">×</button>';
       el.appendChild(div);
+    });
+    el.querySelectorAll("[data-fuente-nombre-idx]").forEach(function(sel){
+      sel.value = fuentesDraft[Number(sel.getAttribute("data-fuente-nombre-idx"))].nombre;
+      sel.addEventListener("change", function(){
+        var idx = Number(sel.getAttribute("data-fuente-nombre-idx"));
+        var nuevo = sel.value;
+        if (fuentesDraft.some(function(r, j){ return j !== idx && r.nombre === nuevo; })){
+          alert("Esa fuente ya está agregada en esta necesidad.");
+          sel.value = fuentesDraft[idx].nombre;
+          return;
+        }
+        fuentesDraft[idx].nombre = nuevo;
+      });
     });
     el.querySelectorAll("[data-fuente-valor-idx]").forEach(function(inp){
       inp.addEventListener("input", function(){
@@ -3631,6 +3677,12 @@
     document.getElementById("f_obs").value = item ? item.observaciones || "" : "";
     document.getElementById("f_pp").disabled = !(profile && profile.role === "admin");
     document.getElementById("f_obs").disabled = !(profile && profile.role === "admin");
+    var esSalud = currentSecretariaId === "salud" || (item && item.secOriginalId === "salud" && currentSecretariaId === "oculto");
+    document.getElementById("subcuentaWrap").style.display = esSalud ? "block" : "none";
+    var selSub = document.getElementById("f_subcuenta");
+    var subActual = item ? (item.subcuenta || "") : "";
+    selSub.innerHTML = '<option value="">Seleccione...</option>' + SALUD_SUBCUENTAS.concat(subActual && SALUD_SUBCUENTAS.indexOf(subActual) < 0 ? [subActual] : []).map(function(s){ return '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'; }).join("");
+    selSub.value = subActual;
     f.actividad.value = item ? item.actividad || "" : "";
     f.servicio.value = item ? item.servicioContratar || "" : "";
     f.objeto.value = item ? item.objeto || "" : "";
@@ -3847,6 +3899,17 @@
     if (res.error){
       alert("No se pudo guardar: " + res.error.message);
       return;
+    }
+    var subWrapVisible = document.getElementById("subcuentaWrap").style.display !== "none";
+    if (subWrapVisible){
+      var subNueva = document.getElementById("f_subcuenta").value || null;
+      var itemIdSub = editingId || (typeof res.data === "string" ? res.data : (res.data && (res.data.id || res.data.item_id)) || null);
+      if (itemIdSub){
+        var subRes = await sb.from("priorizacion_items").update({ subcuenta: subNueva }).eq("id", itemIdSub);
+        if (subRes.error) alert("La necesidad se guardó, pero no se pudo guardar la subcuenta: " + subRes.error.message);
+      } else if (subNueva){
+        alert("La necesidad se guardó, pero no se pudo asociar la subcuenta. Ábrala de nuevo y selecciónela.");
+      }
     }
     if (profile.role === "admin"){
       var ppNuevo = document.getElementById("f_pp").value.trim();
