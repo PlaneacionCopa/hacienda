@@ -3274,7 +3274,10 @@
       var filaBase = filaDe;
       filaDe = function(i){
         var r = filaBase(i);
-        var fs = fuentesByItem[i.id] || [];
+        var fs = (fuentesByItem[i.id] || []).slice();
+        // 11001 siempre de primera cuando hay varias fuentes (el resto conserva su orden)
+        var es11 = function(x){ return fuenteCodigo(x.nombre) === "11001" ? 0 : 1; };
+        fs = fs.map(function(x, k){ return { x: x, k: k }; }).sort(function(a, b){ return (es11(a.x) - es11(b.x)) || (a.k - b.k); }).map(function(o){ return o.x; });
         var cells = [];
         for (var q = 0; q < maxF; q++){
           var fu = fs[q];
