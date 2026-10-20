@@ -1898,8 +1898,8 @@
     return m ? m[1] : String(nombre || "").trim();
   }
   function fuentesCodigos(arr){
-    var cods = (arr || []).map(function(x){ return fuenteCodigo(x.nombre); }).filter(Boolean);
-    return cods.length ? cods.join(", ") : "—";
+    var noms = (arr || []).map(function(x){ return String(x.nombre || "").trim(); }).filter(Boolean);
+    return noms.length ? noms.join("  |  ") : "—";
   }
   // Subcuentas del Fondo Local de Salud (solo se usan en la secretaría de Salud)
   var SALUD_SUBCUENTAS = ["Régimen subsidiado", "Salud pública", "Prestación de servicios (oferta)", "Otros gastos en salud"];
@@ -1996,7 +1996,7 @@
       var dias = calcDiasInclusive(item.fechaInicio, item.fechaFin);
       bottom.innerHTML =
         '<span>' + (item.fechaInicio || "—") + ' → ' + (item.fechaFin || "—") + ' (' + dias + ' días)</span>' +
-        '<span>' + ((item.fuentes && item.fuentes.length > 1) ? "Fuentes: " : "Fuente: ") + escapeHtml(fuentesCodigos(item.fuentes)) + '</span>' +
+        '<span style="flex:1 1 0;min-width:0;text-align:center;overflow-wrap:anywhere;padding:0 .6rem;">' + ((item.fuentes && item.fuentes.length > 1) ? "Fuentes: " : "Fuente: ") + escapeHtml(fuentesCodigos(item.fuentes)) + '</span>' +
         '<span class="total">' + fmtCOP(item.total) + '</span>';
 
       card.appendChild(top);
