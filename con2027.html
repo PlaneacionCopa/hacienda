@@ -1837,8 +1837,16 @@
 
   function subscribeRealtimeCaptura(){
     if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+    // El admin escucha TODOS los cambios de necesidades: cuando una necesidad sale de esta secretaría (a O, a E u otra),
+    // el evento ya no cumple el filtro por secretaría y los totales quedarían desactualizados.
+    var esAdminRT = profile && profile.role === "admin";
+    var refrescoTimer = null;
+    var refrescar = function(){ clearTimeout(refrescoTimer); refrescoTimer = setTimeout(function(){ loadSecretariaData(); }, 400); };
+    var cfgItems = esAdminRT
+      ? { event: "*", schema: "public", table: "priorizacion_items" }
+      : { event: "*", schema: "public", table: "priorizacion_items", filter: "secretaria_id=eq." + currentSecretariaId };
     realtimeChannel = sb.channel("priorizacion-" + currentSecretariaId)
-      .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_items", filter: "secretaria_id=eq." + currentSecretariaId }, function(){ loadSecretariaData(); })
+      .on("postgres_changes", cfgItems, refrescar)
       .on("postgres_changes", { event: "*", schema: "public", table: "priorizacion_listas", filter: "secretaria_id=eq." + currentSecretariaId }, function(){ loadSecretariaData(); })
       .subscribe();
   }
@@ -1894,6 +1902,7 @@
     els.statPS.textContent = state.items.filter(function(i){ return esPS(i.tipoContrato); }).length + ex.ps;
   }
 
+  function esPSNatural(v){ return v === "1-prestaciondeservicios"; }
   function esPS(v){ return v === "1-prestaciondeservicios" || v === "1-prestaciondeserviciosjuridica"; }
   function fuenteCodigo(nombre){
     var m = String(nombre || "").trim().match(/^([0-9][0-9.]*)\s*-/);
@@ -3526,7 +3535,7 @@
   function updateDiasYTotal(){
     var dias = calcDiasInclusive(f.inicio.value, f.fin.value);
     f.dias.value = dias ? (dias + " días") : "0 días";
-    var esPrestacion = esPS(f.tipo.value);
+    var esPrestacion = esPSNatural(f.tipo.value); // solo persona natural calcula por honorarios; jurídica y demás: total manual
     document.getElementById("honorariosRow").style.opacity = esPrestacion ? "1" : ".55";
     f.honorarios.disabled = !esPrestacion;
 
@@ -3899,7 +3908,7 @@
     var totalVal = Number(onlyDigits(f.total.value)) || 0;
     if (totalVal === 0){
       valid = false;
-      alert("Ingrese el total proyectado del contrato" + (!esPS(f.tipo.value) ? " (obligatorio cuando el tipo de contrato no es prestación de servicios)." : "."));
+      alert("Ingrese el total proyectado del contrato" + (!esPSNatural(f.tipo.value) ? " (obligatorio cuando el tipo de contrato no es prestación de servicios persona natural)." : "."));
     } else if (fuentesDraft.length === 0){
       valid = false;
       alert("Seleccione al menos una fuente de financiación.");
