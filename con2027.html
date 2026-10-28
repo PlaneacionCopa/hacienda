@@ -2292,9 +2292,14 @@
     // Secretaría efectiva: las ocultas (O) cuentan para su secretaría de origen
     var secEf = function(i){ return i.secretaria_original_id || i.secretaria_id; };
     var itemsFunc = items.filter(function(i){ return i.tipo_necesidad === "funcionamiento"; });
-    ["inder", "invicop", "adm_central"].forEach(function(sid){
+    ["inder", "invicop", "fondo_salud", "adm_central"].forEach(function(sid){
       // Administración central = funcionamiento (necesidades de contratación) − honorarios de INDER e INVICOP
-      var its = itemsFunc.filter(function(i){ var e = secEf(i); return sid === "adm_central" ? (e !== "inder" && e !== "invicop") : e === sid; });
+      var its = itemsFunc.filter(function(i){
+        var e = secEf(i);
+        if (sid === "adm_central") return e !== "inder" && e !== "invicop" && e !== "salud";
+        if (sid === "fondo_salud") return e === "salud";
+        return e === sid;
+      });
       funcAuto[sid] = { total: its.reduce(function(s,i){ return s + Number(i.total||0); }, 0), n: its.length, fuentes: {}, ids: its.map(function(i){ return i.id; }) };
     });
     var idsAuto = [];
@@ -2446,12 +2451,12 @@
 
   // ---------- Funcionamiento por entidad (fuentes manuales; el total es la suma de las fuentes) ----------
   var FUNC_ENTIDADES = [
-    { id: "adm_central", nombre: "Administración central", grupos: [{ key: "honorarios", label: "Honorarios", auto: true, nota: "Funcionamiento (necesidades de contratación) − honorarios de INDER e INVICOP" }, { key: "otros", label: "Otros gastos" }] },
+    { id: "adm_central", nombre: "Administración central", grupos: [{ key: "honorarios", label: "Honorarios", auto: true, nota: "Funcionamiento (necesidades de contratación) − honorarios de INDER, INVICOP y Fondo local de salud" }, { key: "otros", label: "Otros gastos" }] },
     { id: "inder", nombre: "INDER", grupos: [{ key: "personal", label: "Gastos de personal" }, { key: "honorarios", label: "Honorarios", auto: true }, { key: "otros", label: "Otros gastos" }] },
     { id: "invicop", nombre: "INVICOP", grupos: [{ key: "personal", label: "Gastos de personal" }, { key: "honorarios", label: "Honorarios", auto: true }, { key: "otros", label: "Otros gastos" }] },
     { id: "concejo", nombre: "Concejo", grupos: [{ key: "fuentes", label: "" }] },
     { id: "personeria", nombre: "Personería", grupos: [{ key: "fuentes", label: "" }] },
-    { id: "fondo_salud", nombre: "Fondo local de salud", grupos: [{ key: "fuentes", label: "" }] },
+    { id: "fondo_salud", nombre: "Fondo local de salud", grupos: [{ key: "honorarios", label: "Honorarios", auto: true, nota: "Necesidades de funcionamiento de la secretaría de Salud" }, { key: "fuentes", label: "Otros gastos" }] },
     { id: "deuda", nombre: "Servicio de la deuda", deuda: true, grupos: [{ key: "capital", label: "Capital" }, { key: "intereses", label: "Intereses" }, { key: "contingencias", label: "Fondo de contingencias" }] }
   ];
   var funcState = {};
