@@ -89,7 +89,7 @@
   .status-enviado{background:var(--green-bg);color:var(--green);}
 
   .summary-strip{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:0;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0;
     border-bottom:1px solid var(--line);
   }
   .summary-item{padding:.95rem 1.4rem;border-right:1px solid var(--line);}
@@ -536,6 +536,8 @@
       </div>
     </div>
 
+    <div class="card" id="saludSubtotales" style="display:none;margin:0 0 1rem;padding:1rem 1.2rem;overflow-x:auto;"></div>
+
     <div class="summary-strip">
       <div class="summary-item">
         <div class="num" id="statCount">0</div>
@@ -543,7 +545,15 @@
       </div>
       <div class="summary-item">
         <div class="num" id="statTotal">$0</div>
-        <div class="lbl">Total proyectado</div>
+        <div class="lbl">Total de las necesidades</div>
+      </div>
+      <div class="summary-item">
+        <div class="num" id="statInversion">$0</div>
+        <div class="lbl">Total inversión</div>
+      </div>
+      <div class="summary-item">
+        <div class="num" id="statFuncionamiento">$0</div>
+        <div class="lbl">Total funcionamiento</div>
       </div>
       <div class="summary-item">
         <div class="num" id="statPS">0</div>
@@ -1587,6 +1597,8 @@
     statusPill: document.getElementById("statusPill"),
     statCount: document.getElementById("statCount"),
     statTotal: document.getElementById("statTotal"),
+    statInversion: document.getElementById("statInversion"),
+    statFuncionamiento: document.getElementById("statFuncionamiento"),
     statPS: document.getElementById("statPS"),
     itemsList: document.getElementById("itemsList"),
     emptyState: document.getElementById("emptyState"),
@@ -1785,11 +1797,14 @@
     }
 
     // Ocultas (O) cuyo origen es esta secretaría: siguen sumando en sus estadísticas (no se listan aquí ni se duplican en inversión)
-    state.ocultosExtra = { n: 0, total: 0, ps: 0 };
+    state.ocultosExtra = { n: 0, total: 0, ps: 0, inversion: 0 };
+    state.ocultosItems = [];
     if (profile && profile.role === "admin" && currentSecretariaId !== "oculto" && currentSecretariaId !== "eliminado"){
-      var ocRes = await sb.from("priorizacion_items").select("total, tipo_contrato").eq("secretaria_original_id", currentSecretariaId).eq("oculto", true).eq("eliminado", false);
+      var ocRes = await sb.from("priorizacion_items").select("total, tipo_contrato, tipo_necesidad, subcuenta, actividad").eq("secretaria_original_id", currentSecretariaId).eq("oculto", true).eq("eliminado", false);
       (ocRes.data || []).forEach(function(o){
         state.ocultosExtra.n++; state.ocultosExtra.total += Number(o.total) || 0;
+        if (o.tipo_necesidad !== "funcionamiento") state.ocultosExtra.inversion += Number(o.total) || 0;
+        state.ocultosItems.push({ total: Number(o.total) || 0, tipoNecesidad: o.tipo_necesidad, subcuenta: o.subcuenta || "", actividad: o.actividad || "" });
         if (esPS(o.tipo_contrato)) state.ocultosExtra.ps++;
       });
     }
@@ -1894,11 +1909,60 @@
     els.btnEnviar.disabled = enviado || state.items.length === 0;
   }
 
+  // ---------- Salud: subtotales por subcuenta y, de lo restante, por actividad (PAE / Adulto mayor) ----------
+  function sinTildes(s){ return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); }
+  function renderSaludSubtotales(){
+    var box = document.getElementById("saludSubtotales");
+    if (!box) return;
+    if (currentSecretariaId !== "salud" || !profile || profile.role === "alcalde"){ box.style.display = "none"; return; }
+    var todos = state.items.map(function(i){ return { total: Number(i.total)||0, tipoNecesidad: i.tipoNecesidad, subcuenta: i.subcuenta || "", actividad: i.actividad || "" }; })
+      .concat(state.ocultosItems || []);
+    var grupos = [];
+    var porSub = {};
+    SALUD_SUBCUENTAS.forEach(function(s){ porSub[s] = { label: s, n: 0, total: 0, inv: 0 }; grupos.push(porSub[s]); });
+    var pae = { label: "PAE (por actividad)", n: 0, total: 0, inv: 0 };
+    var adulto = { label: "Adulto mayor (por actividad)", n: 0, total: 0, inv: 0 };
+    var otros = { label: "Otros sin subcuenta ni PAE / Adulto mayor", n: 0, total: 0, inv: 0 };
+    var otraSub = { label: "Otra subcuenta", n: 0, total: 0, inv: 0 };
+    todos.forEach(function(it){
+      var g;
+      if (it.subcuenta){ g = porSub[it.subcuenta] || otraSub; }
+      else {
+        var a = sinTildes(it.actividad);
+        if (/\bpae\b/.test(a)) g = pae;
+        else if (/adulto(s)?\s+mayor(es)?/.test(a)) g = adulto;
+        else g = otros;
+      }
+      g.n++; g.total += it.total; if (it.tipoNecesidad !== "funcionamiento") g.inv += it.total;
+    });
+    function fila(g, estilo){
+      return '<div class="pres-row" style="' + (estilo || "") + '"><div>' + escapeHtml(g.label) + '</div><div class="num">' + g.n + '</div><div class="num">' + fmtCOP(g.total) + '</div><div class="num">' + fmtCOP(g.inv) + '</div></div>';
+    }
+    function sub(titulo, arr){
+      var t = arr.reduce(function(s,g){ return { n: s.n + g.n, total: s.total + g.total, inv: s.inv + g.inv }; }, { n: 0, total: 0, inv: 0 });
+      return '<div class="pres-row" style="background:var(--navy-050);font-weight:700;"><div>' + titulo + '</div><div class="num">' + t.n + '</div><div class="num">' + fmtCOP(t.total) + '</div><div class="num">' + fmtCOP(t.inv) + '</div></div>' + arr.map(function(g){ return fila(g); }).join("");
+    }
+    var conSub = grupos.concat(otraSub.n ? [otraSub] : []);
+    var sinSub = [pae, adulto, otros];
+    var all = conSub.concat(sinSub);
+    var tot = all.reduce(function(s,g){ return { n: s.n + g.n, total: s.total + g.total, inv: s.inv + g.inv }; }, { n: 0, total: 0, inv: 0 });
+    box.style.display = "block";
+    box.innerHTML = '<div class="section-label" style="margin-bottom:.5rem;">Subtotales de Salud</div>' +
+      '<div class="pres-row head"><div>Categoría</div><div class="num">Necesidades</div><div class="num">Total necesidades</div><div class="num">Total inversión</div></div>' +
+      sub("Por subcuenta", conSub) +
+      sub("Lo restante (sin subcuenta), según actividad a desarrollar", sinSub) +
+      '<div class="pres-row foot"><div>Total Salud</div><div class="num">' + tot.n + '</div><div class="num">' + fmtCOP(tot.total) + '</div><div class="num">' + fmtCOP(tot.inv) + '</div></div>';
+  }
+
   function renderStats(){
     var ex = state.ocultosExtra || { n: 0, total: 0, ps: 0 };
     els.statCount.textContent = state.items.length + ex.n;
     var total = state.items.reduce(function(s,i){ return s + (Number(i.total)||0); },0) + ex.total;
     els.statTotal.textContent = fmtCOP(total);
+    var invTot = state.items.filter(function(i){ return i.tipoNecesidad !== "funcionamiento"; }).reduce(function(s,i){ return s + (Number(i.total)||0); },0) + (ex.inversion || 0);
+    els.statInversion.textContent = fmtCOP(invTot);
+    els.statFuncionamiento.textContent = fmtCOP(total - invTot);
+    renderSaludSubtotales();
     els.statPS.textContent = state.items.filter(function(i){ return esPS(i.tipoContrato); }).length + ex.ps;
   }
 
@@ -2117,7 +2181,7 @@
         '<div class="item-tags"><span class="status-pill ' + pillClass + '">' + pillText + '</span>' +
         '<span class="tag">' + (r.total_items||0) + ' necesidades</span>' +
         '<span class="tag">' + (r.total_prestacion_servicios||0) + ' de prestación de servicios</span></div></div>' +
-        '<div class="total" style="font-weight:800;font-size:1rem;">' + fmtCOP(r.total_proyectado) + '</div>' +
+        '<div style="text-align:right;"><div class="total" style="font-weight:800;font-size:1rem;">' + fmtCOP(r.total_proyectado) + '</div><div style="font-size:.74rem;color:var(--ink-soft);">Inversión: ' + fmtCOP(r.total_inversion) + '</div><div style="font-size:.74rem;color:var(--ink-soft);">Funcionamiento: ' + fmtCOP(r.total_funcionamiento) + '</div></div>' +
         '</div></div>';
     }).join("") || "<p>No hay datos todavía.</p>";
   }
@@ -2156,7 +2220,7 @@
         '<div class="item-tags"><span class="status-pill ' + pillClass + '">' + pillText + '</span>' +
         '<span class="tag">' + (r.total_items||0) + ' necesidades</span></div></div>' +
         '<div style="display:flex;align-items:center;gap:.8rem;">' +
-        '<div class="total" style="font-weight:800;">' + fmtCOP(r.total_proyectado) + '</div>' +
+        '<div style="text-align:right;"><div class="total" style="font-weight:800;">' + fmtCOP(r.total_proyectado) + '</div><div style="font-size:.74rem;color:var(--ink-soft);">Inversión: ' + fmtCOP(r.total_inversion) + '</div><div style="font-size:.74rem;color:var(--ink-soft);">Funcionamiento: ' + fmtCOP(r.total_funcionamiento) + '</div></div>' +
         '<div style="display:flex;gap:.4rem;">' +
         (enviado ? '<button type="button" class="btn btn-ghost btn-sm" data-reabrir="' + r.secretaria_id + '">Reabrir</button>' : '') +
         '<button type="button" class="btn btn-primary btn-sm" data-editar="' + r.secretaria_id + '">Editar</button>' +
@@ -3334,15 +3398,15 @@
         await renderPresupuestoPanel(); // asegura datos al día (presExport, funcState, funcAuto)
         var resRes = await sb.from("priorizacion_resumen").select("*").order("secretaria_nombre");
         var resData = (resRes.data || []).filter(function(r){ return r.secretaria_id !== "eliminado"; });
-        var aoaRes = [["Secretaría", "Estado de la lista", "N° de necesidades", "Total proyectado"]];
-        var tn = 0, tt = 0;
+        var aoaRes = [["Secretaría", "Estado de la lista", "N° de necesidades", "Total de las necesidades", "Total inversión", "Total funcionamiento"]];
+        var tn = 0, tt = 0, ti = 0, tf = 0;
         resData.forEach(function(r){
-          aoaRes.push([r.secretaria_nombre, r.status === "enviado" ? "Enviado" : "Borrador", Number(r.total_items) || 0, Number(r.total_proyectado) || 0]);
-          tn += Number(r.total_items) || 0; tt += Number(r.total_proyectado) || 0;
+          aoaRes.push([r.secretaria_nombre, r.status === "enviado" ? "Enviado" : "Borrador", Number(r.total_items) || 0, Number(r.total_proyectado) || 0, Number(r.total_inversion) || 0, Number(r.total_funcionamiento) || 0]);
+          tn += Number(r.total_items) || 0; tt += Number(r.total_proyectado) || 0; ti += Number(r.total_inversion) || 0; tf += Number(r.total_funcionamiento) || 0;
         });
-        aoaRes.push(["TOTAL", "", tn, tt]);
+        aoaRes.push(["TOTAL", "", tn, tt, ti, tf]);
         var wsRes = XLSX.utils.aoa_to_sheet(aoaRes);
-        wsRes["!cols"] = [{ wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 22 }];
+        wsRes["!cols"] = [{ wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 24 }, { wch: 22 }, { wch: 22 }];
         XLSX.utils.book_append_sheet(wb, wsRes, "Panel administración");
 
         if (presExport){
