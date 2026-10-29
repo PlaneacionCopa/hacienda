@@ -464,6 +464,19 @@
       <button class="btn btn-primary btn-sm" id="btnPresCargarCsv" style="align-self:flex-end;">⬆ Cargar CSV</button>
       <span class="disabled-note" id="presCsvStatus"></span>
     </div>
+    <div class="pres-upload-row" id="presAdicRow">
+      <div class="field" style="min-width:300px;flex:2;">
+        <label for="presAdicNombre">Agregar ingreso adicional (fuente que no viene en el CSV)</label>
+        <input type="text" id="presAdicNombre" list="presAdicDatalist" placeholder="Ej. 31405-Otras Entidades - Area Metropolitana" autocomplete="off">
+        <datalist id="presAdicDatalist"></datalist>
+      </div>
+      <div class="field" style="min-width:160px;">
+        <label for="presAdicValor">Valor del ingreso</label>
+        <input type="text" inputmode="numeric" id="presAdicValor" placeholder="$0">
+      </div>
+      <button class="btn btn-primary btn-sm" id="btnPresAdic" style="align-self:flex-end;">+ Agregar ingreso</button>
+    </div>
+    <div id="presAdicList" style="padding:0 1.4rem;display:flex;flex-direction:column;gap:.3rem;"></div>
 
     <div class="pres-section-title">Ingresos vs. gastos por fuente de financiación</div>
     <div class="pres-table" id="presTablaFuentes"></div>
@@ -507,6 +520,7 @@
       <div class="pres-box" id="presTotalIngresosBox">
         <label for="presTotalIngresos">Total presupuesto de ingresos</label>
         <input type="text" inputmode="numeric" id="presTotalIngresos" placeholder="$0">
+        <div id="presTotalIngresosNota" style="font-size:.72rem;color:var(--ink-soft);margin-top:.2rem;"></div>
       </div>
       <div class="pres-box total readonly" id="presDiferenciaBox">
         <label>Diferencia (ingresos − gastos)</label>
@@ -2334,6 +2348,8 @@
       var res = await sb.from("presupuesto_fuentes_ingresos").select("nombre_fuente").order("nombre_fuente");
       if (!res.error && res.data && res.data.length){
         FUENTES_OPTIONS = res.data.map(function(r){ return r.nombre_fuente; });
+        var adRes = await sb.from("presupuesto_ingresos_adicionales").select("nombre_fuente");
+        (adRes.data || []).forEach(function(a){ if (FUENTES_OPTIONS.indexOf(a.nombre_fuente) < 0) FUENTES_OPTIONS.push(a.nombre_fuente); });
       } else {
         FUENTES_OPTIONS = DEFAULT_FUENTES_OPTIONS.slice();
       }
@@ -2355,7 +2371,18 @@
     document.getElementById("presTotalIngresos").disabled = !esAdmin;
 
     var fuentesRes = await sb.from("presupuesto_fuentes_ingresos").select("*").order("nombre_fuente");
-    var fuentesIngresos = fuentesRes.data || [];
+    var fuentesIngresos = (fuentesRes.data || []).map(function(r){ return { nombre_fuente: r.nombre_fuente, valor: r.valor }; });
+
+    // Ingresos adicionales (manuales): se suman a la fuente si ya existe en el CSV, o aparecen como fuente nueva
+    var adicRes = await sb.from("presupuesto_ingresos_adicionales").select("*").order("nombre_fuente");
+    var adicionales = adicRes.error ? [] : (adicRes.data || []);
+    var sumAdic = 0;
+    adicionales.forEach(function(a){
+      sumAdic += Number(a.valor || 0);
+      var ex = fuentesIngresos.filter(function(fu){ return fkey(fu.nombre_fuente) === fkey(a.nombre_fuente); })[0];
+      if (ex) ex.valor = Number(ex.valor || 0) + Number(a.valor || 0);
+      else fuentesIngresos.push({ nombre_fuente: a.nombre_fuente, valor: Number(a.valor || 0), _adicional: true });
+    });
 
     var cfgRes = await sb.from("presupuesto_config").select("*").eq("id", "singleton").maybeSingle();
     var cfg = cfgRes.data || { total_presupuesto_ingresos: null, servicio_deuda: 0 };
@@ -2466,7 +2493,7 @@
       var dif = ingreso - gasto;
       sumIngreso += ingreso; sumGasto += gasto;
       presRows.push([fu.nombre_fuente, ingreso, gasto, dif]);
-      filasHtml += '<div class="pres-row"><div>' + escapeHtml(fu.nombre_fuente) + '</div>' +
+      filasHtml += '<div class="pres-row"><div>' + escapeHtml(fu.nombre_fuente) + (fu._adicional ? ' <span class="tag" style="margin-left:.3rem;">ingreso adicional</span>' : '') + '</div>' +
         '<div class="num">' + fmtCOP(ingreso) + '</div>' +
         '<div class="num">' + fmtCOP(gasto) + '</div>' +
         '<div class="num ' + (dif < 0 ? "pres-diff-neg" : "pres-diff-pos") + '">' + fmtCOP(dif) + '</div></div>';
@@ -2496,6 +2523,26 @@
 
     presRows.push(["TOTAL", sumIngreso, sumGasto, sumIngreso - sumGasto]);
     presExport = presRows;
+
+    // Lista de ingresos adicionales (con opción de quitarlos) y sugerencias de fuentes
+    var adicEl = document.getElementById("presAdicList");
+    adicEl.innerHTML = adicionales.map(function(a){
+      return '<div class="func-row"><span>Ingreso adicional: ' + escapeHtml(a.nombre_fuente) + '</span><span class="num">' + fmtCOP(Number(a.valor || 0)) + '</span>' +
+        (esAdmin ? '<button type="button" data-adic-del="' + escapeHtml(a.nombre_fuente) + '">×</button>' : '<span></span>') + '</div>';
+    }).join("");
+    adicEl.querySelectorAll("[data-adic-del]").forEach(function(btn){
+      btn.addEventListener("click", async function(){
+        var r = await sb.rpc("admin_delete_ingreso_adicional", { p_nombre: btn.getAttribute("data-adic-del") });
+        if (r.error){ alert("No se pudo quitar: " + r.error.message); return; }
+        await loadFuentesCatalogo();
+        await renderPresupuestoPanel();
+      });
+    });
+    document.getElementById("presAdicRow").style.display = esAdmin ? "flex" : "none";
+    var sugeridas = {};
+    Object.keys(gastoNombre).forEach(function(k){ sugeridas[gastoNombre[k]] = true; });
+    DEFAULT_FUENTES_OPTIONS.forEach(function(n){ sugeridas[n] = true; });
+    document.getElementById("presAdicDatalist").innerHTML = Object.keys(sugeridas).sort().map(function(n){ return '<option value="' + escapeHtml(n) + '"></option>'; }).join("");
 
     if (!fuentesIngresos.length && !filasHtml){
       tabla.innerHTML = '<p style="padding:.6rem .4rem;color:var(--ink-soft);">Todavía no se ha cargado el CSV de ingresos por fuente de financiación.</p>';
@@ -2543,7 +2590,8 @@
     var totalGastos = totalFuncPres + servicioDeuda + totalInversion;
     document.getElementById("presTotalGastos").textContent = fmtCOP(totalGastos);
 
-    var totalIngresosVal = totalIngresosCfg !== null ? totalIngresosCfg : 0;
+    var totalIngresosVal = (totalIngresosCfg !== null ? totalIngresosCfg : 0) + sumAdic;  // total del CSV + ingresos adicionales
+    document.getElementById("presTotalIngresosNota").textContent = sumAdic > 0 ? ("+ ingresos adicionales " + fmtCOP(sumAdic) + " = total efectivo " + fmtCOP(totalIngresosVal)) : "";
     var diferencia = totalIngresosVal - totalGastos;
     var difBox = document.getElementById("presDiferenciaBox");
     difBox.classList.remove("diff-pos", "diff-neg");
@@ -2662,6 +2710,18 @@
     }
     return { func: totalGeneral, deuda: totalDeudaGen };
   }
+
+  document.getElementById("btnPresAdic").addEventListener("click", async function(){
+    var nombre = document.getElementById("presAdicNombre").value.trim();
+    var valor = Number(onlyDigits(document.getElementById("presAdicValor").value)) || 0;
+    if (!nombre || valor <= 0){ alert("Escriba la fuente y un valor mayor a 0."); return; }
+    var r = await sb.rpc("admin_set_ingreso_adicional", { p_nombre: nombre, p_valor: valor });
+    if (r.error){ alert("No se pudo agregar el ingreso: " + r.error.message); return; }
+    document.getElementById("presAdicNombre").value = "";
+    document.getElementById("presAdicValor").value = "";
+    await loadFuentesCatalogo();
+    await renderPresupuestoPanel();
+  });
 
   document.getElementById("btnPresCargarCsv").addEventListener("click", async function(){
     var fileInput = document.getElementById("presCsvFile");
