@@ -513,6 +513,22 @@
         <div class="val" id="presDiferencia">$0</div>
       </div>
     </div>
+
+    <div class="pres-section-title">Cálculo ley 617/2000</div>
+    <div class="pres-grid3">
+      <div class="pres-box readonly">
+        <label>Total de gastos de funcionamiento de la fuente 11001</label>
+        <div class="val" id="presL617Gastos">$0</div>
+      </div>
+      <div class="pres-box readonly">
+        <label>Total ingresos de la fuente 11001</label>
+        <div class="val" id="presL617Ingresos">$0</div>
+      </div>
+      <div class="pres-box total readonly">
+        <label>Total ley 617/00 (%)</label>
+        <div class="val" id="presL617Pct">—</div>
+      </div>
+    </div>
   </div>
 
   <!-- Vista de captura (secretaría / admin) -->
@@ -2502,6 +2518,28 @@
     var totalFuncPres = tot.func + totalFuncionamiento, servicioDeuda = tot.deuda;  // entidades + necesidades de contratación de funcionamiento
     document.getElementById("presResFuncionamiento").textContent = fmtCOP(totalFuncPres);
     document.getElementById("presServicioDeuda").textContent = fmtCOP(servicioDeuda);
+    // ---- Cálculo ley 617/2000: gastos de funcionamiento de la fuente 11001 / ingresos de la fuente 11001 ----
+    var gasto617 = 0;
+    itemsFunc.forEach(function(i){
+      var fs = fuentesPorItem[i.id] || [];
+      fs.forEach(function(r){
+        if (fkey(r.nombre) !== "11001") return;
+        gasto617 += fs.length === 1 ? (totPorItem[i.id] || 0) : Number(r.valor || 0);
+      });
+    });
+    FUNC_ENTIDADES.forEach(function(en){
+      if (en.deuda) return; // el servicio de la deuda no es gasto de funcionamiento
+      en.grupos.forEach(function(g){
+        if (g.auto) return; // ya salen de las necesidades de funcionamiento
+        (funcState[en.id][g.key] || []).forEach(function(x){ if (fkey(x.nombre) === "11001") gasto617 += x.valor; });
+      });
+    });
+    var ingreso617 = fuentesIngresos.filter(function(fu){ return fkey(fu.nombre_fuente) === "11001"; })
+      .reduce(function(s, fu){ return s + Number(fu.valor || 0); }, 0);
+    document.getElementById("presL617Gastos").textContent = fmtCOP(gasto617);
+    document.getElementById("presL617Ingresos").textContent = fmtCOP(ingreso617);
+    document.getElementById("presL617Pct").textContent = ingreso617 > 0 ? (gasto617 / ingreso617 * 100).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " %" : "—";
+
     var totalGastos = totalFuncPres + servicioDeuda + totalInversion;
     document.getElementById("presTotalGastos").textContent = fmtCOP(totalGastos);
 
